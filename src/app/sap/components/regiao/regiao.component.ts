@@ -39,7 +39,12 @@ export class RegiaoComponent implements OnInit, OnDestroy {
   filiais : Array<Branch> = new Array()
 
   criandoRegiao = false
-  novaRegiao : any = { Code: '', U_NomeRegiao: '', U_CodCordenador: '', U_Filial: null }
+  novaRegiao : any = { Code: '', U_NomeRegiao: '', U_CodCordenador: '', U_Filial: null, U_CustoTransporte: null }
+
+  //edicao do cadastro da regiao aberta (codigo, nome e coordenador). Trocar o
+  //codigo recria a regiao no SAP, entao o retorno pode vir com outro Code
+  editandoRegiao : any = { Code: '', U_NomeRegiao: '', U_CodCordenador: '', U_CustoTransporte: null }
+  salvandoCadastro = false
 
   //localidade escolhida no buscador, aguardando a distancia antes de confirmar o vinculo
   localidadePendente : Localidade = null
@@ -74,6 +79,7 @@ export class RegiaoComponent implements OnInit, OnDestroy {
   @ViewChild('modalSubstituir', { static: true }) modalSubstituir : ModalComponent
   @ViewChild('modalNovaLocalidade', { static: true }) modalNovaLocalidade : ModalComponent
   @ViewChild('modalAlterarFilial', { static: true }) modalAlterarFilial : ModalComponent
+  @ViewChild('modalEditarRegiao', { static: true }) modalEditarRegiao : ModalComponent
 
   //reflete a regiao selecionada na URL (/regioes/:code), pra sobreviver a um F5
   private routeSub : Subscription
@@ -222,7 +228,7 @@ export class RegiaoComponent implements OnInit, OnDestroy {
   }
 
   abrirNovaRegiao(){
-    this.novaRegiao = { Code: '', U_NomeRegiao: '', U_CodCordenador: '', U_Filial: null }
+    this.novaRegiao = { Code: '', U_NomeRegiao: '', U_CodCordenador: '', U_Filial: null, U_CustoTransporte: null }
     this.criandoRegiao = true
   }
 
@@ -341,6 +347,69 @@ export class RegiaoComponent implements OnInit, OnDestroy {
       next : (it) => this.atualizaSelecionada(it, false),
       error : (e) => {
         this.loading = false
+        this.alert.error(this.mensagemErro(e))
+      }
+    })
+  }
+
+  abreModalEditarRegiao(){
+    if(!this.selecionada)
+      return
+    this.editandoRegiao = {
+      Code : this.selecionada.Code,
+      U_NomeRegiao : this.selecionada.U_NomeRegiao || this.selecionada.Name,
+      U_CodCordenador : this.selecionada.U_CodCordenador,
+      U_CustoTransporte : this.selecionada.custoTransporte
+    }
+    this.modalEditarRegiao.openModal()
+  }
+
+  salvarCadastroRegiao(){
+    if(!this.selecionada)
+      return
+    const codeAtual = this.selecionada.Code
+    const novoCode = (this.editandoRegiao.Code || '').trim()
+    const nome = (this.editandoRegiao.U_NomeRegiao || '').trim()
+    if(!novoCode || !nome){
+      this.alert.info('Informe o código e o nome da região.')
+      return
+    }
+    //trocar o codigo nao e um patch: o back apaga e recria a regiao no SAP
+    //(o Code e a chave do UDO), por isso a confirmacao explicita
+    if(novoCode != codeAtual){
+      this.alert.confirm(
+        `Trocar o código da região de ${codeAtual} para ${novoCode}? ` +
+        `A região é recriada no SAP com o novo código, mantendo localidades, faixas de preço e filial.`
+      ).then(result => {
+        if(result.isConfirmed)
+          this.enviaCadastroRegiao(codeAtual, novoCode, nome)
+      })
+      return
+    }
+    this.enviaCadastroRegiao(codeAtual, novoCode, nome)
+  }
+
+  private enviaCadastroRegiao(codeAtual : string, novoCode : string, nome : string){
+    this.salvandoCadastro = true
+    this.service.update(codeAtual, {
+      Code : novoCode,
+      Name : nome,
+      U_NomeRegiao : nome,
+      U_CodCordenador : (this.editandoRegiao.U_CodCordenador || '').trim(),
+      U_CustoTransporte : Number(this.editandoRegiao.U_CustoTransporte || 0)
+    }).subscribe({
+      next : (it) => {
+        this.salvandoCadastro = false
+        this.modalEditarRegiao.closeModal()
+        //a regiao aberta vive na URL (/configuracoes/frete/:code) - se o codigo
+        //mudou, o caminho antigo nao existe mais no SAP e precisa ser trocado
+        if(it.Code != codeAtual)
+          this.router.navigate(['/configuracoes/frete', it.Code])
+        else
+          this.atualizaSelecionada(it, false)
+      },
+      error : (e) => {
+        this.salvandoCadastro = false
         this.alert.error(this.mensagemErro(e))
       }
     })

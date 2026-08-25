@@ -59,7 +59,7 @@ export class ComissaoComponent implements OnInit {
     this.route.paramMap.subscribe(params => {
       const code = params.get('code')
       if(code)
-        this.carregarSelecionada(Number(code))
+        this.carregarSelecionada(code)
       else {
         this.selecionada = null
         this.carregarLista()
@@ -75,7 +75,7 @@ export class ComissaoComponent implements OnInit {
     })
   }
 
-  private carregarSelecionada(code : number){
+  private carregarSelecionada(code : string){
     this.loading = true
     this.service.get(code).subscribe({
       next : (it) => { this.selecionada = it; this.loading = false; this.resolverVendedores() },

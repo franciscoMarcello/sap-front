@@ -114,6 +114,7 @@ import { SapSharedModule } from './modulos/sap-shared/sap-shared.module';
 import { InvoiceGenerationService } from './sap/service/invoice-generation.service';
 import { OrdemCarregamentoModule } from './modulos/ordem-carregamento/ordem-carregamento.module';
 import { PainelVendasModule } from './modulos/painel-vendas/painel-vendas.module';
+import { RelatorioFreteModule } from './modulos/relatorio-frete/relatorio-frete.module';
 import { QRCodeModule } from 'angularx-qrcode';
 import { CobrancaModule } from './modulos/cobranca/cobranca.module';
 
@@ -206,6 +207,7 @@ const httpLoaderFactory = (http: HttpClient): TranslateHttpLoader =>  new Transl
     QRCodeModule,
     OrdemCarregamentoModule,
     PainelVendasModule,
+    RelatorioFreteModule,
     CobrancaModule,
     ReactiveFormsModule,
     LoadingBarModule,
