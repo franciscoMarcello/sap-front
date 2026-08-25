@@ -71,6 +71,12 @@
                         <div class="col-sm-3 form-group">
                             <app-branch-select (selectedOut)="selecionaFilialNova($event)"></app-branch-select>
                         </div>
+                        <div class="col-sm-3 form-group">
+                            <label>Custo de transporte por unidade (R$)</label>
+                            <app-currency-input name="novoCustoTransporte" [(ngModel)]="novaRegiao.U_CustoTransporte"
+                                                placeholder="R$ 0,00"></app-currency-input>
+                            <small class="form-text text-muted">Fábrica até a unidade dessa região.</small>
+                        </div>
                     </div>
                 </div>
                 <div class="card-footer">
@@ -144,6 +150,9 @@
                 </span>
             </h3>
             <div class="card-tools">
+                <button class="btn btn-sm btn-outline-light mr-2" (click)="abreModalEditarRegiao()">
+                    <i class="far fa-edit"></i> Editar Região
+                </button>
                 <button *ngIf="!selecionada.ativa" class="btn btn-sm btn-success" (click)="ativarSelecionada()">
                     <i class="fas fa-check-circle"></i> Ativar
                 </button>
@@ -254,6 +263,14 @@
 
                 <app-tab tabTitle="Preço do Frete">
                     <h5>Preço do Frete Progressivo (R$ por km por unidade)</h5>
+                    <div class="alert" [class.alert-info]="selecionada.custoTransporte > 0" [class.alert-secondary]="selecionada.custoTransporte == 0">
+                        <b>Custo de transporte:</b>
+                        {{selecionada.custoTransporte | currency:'BRL':'symbol':'1.2-2':'pt-BR'}} por unidade
+                        (fábrica até a unidade da região), somado ao valor de cada faixa no preço final.
+                        <button class="btn btn-xs btn-link" (click)="abreModalEditarRegiao()">
+                            <i class="far fa-edit"></i> alterar
+                        </button>
+                    </div>
                     <div class="card card-outline card-secondary">
                         <div class="card-body">
                             <div class="form-row align-items-end">
@@ -339,6 +356,25 @@
                             <dd><b>{{resultadoCalculo.total | currency:'BRL':'symbol':'1.2-2':'pt-BR'}}</b></dd>
                         </div>
                     </div>
+
+                    <div *ngIf="resultadoCalculo" class="row">
+                        <div class="col-sm-3">
+                            <dt>Distância x faixa (por unidade)</dt>
+                            <dd>{{resultadoCalculo.valorFaixaUnidade | currency:'BRL':'symbol':'1.2-2':'pt-BR'}}</dd>
+                        </div>
+                        <div class="col-sm-3">
+                            <dt>Custo de transporte (por unidade)</dt>
+                            <dd>{{resultadoCalculo.custoTransporte | currency:'BRL':'symbol':'1.2-2':'pt-BR'}}</dd>
+                        </div>
+                        <div class="col-sm-3">
+                            <dt>Frete por unidade</dt>
+                            <dd><b>{{resultadoCalculo.valorUnidade | currency:'BRL':'symbol':'1.2-2':'pt-BR'}}</b></dd>
+                        </div>
+                        <div class="col-sm-3">
+                            <dt>Quantidade</dt>
+                            <dd>{{resultadoCalculo.quantidade}}</dd>
+                        </div>
+                    </div>
                 </app-tab>
             </app-tabs>
         </div>
@@ -352,7 +388,53 @@
         </div>
     </div>
 
-    <app-regiao-frete-pdf #fretePdf [regiao]="selecionada" [localidades]="localidades"></app-regiao-frete-pdf>
+    <app-regiao-frete-pdf #fretePdf [regiao]="selecionada" [localidades]="localidades" [filiais]="filiais"></app-regiao-frete-pdf>
+
+    <app-modal #modalEditarRegiao [title]="'Editar Região'" [modalSize]="'lg'">
+        <form (ngSubmit)="salvarCadastroRegiao()" autocomplete="off">
+            <div class="form-row">
+                <div class="form-group col-sm-3">
+                    <label for="codigoEditarRegiao">Código</label>
+                    <input id="codigoEditarRegiao" name="codigoEditarRegiao" type="text" class="form-control"
+                           maxlength="50" [(ngModel)]="editandoRegiao.Code" required>
+                </div>
+                <div class="form-group col-sm-5">
+                    <label for="nomeEditarRegiao">Nome da Região</label>
+                    <input id="nomeEditarRegiao" name="nomeEditarRegiao" type="text" class="form-control"
+                           maxlength="100" [(ngModel)]="editandoRegiao.U_NomeRegiao" required>
+                </div>
+                <div class="form-group col-sm-4">
+                    <label for="coordenadorEditarRegiao">Coordenador</label>
+                    <input id="coordenadorEditarRegiao" name="coordenadorEditarRegiao" type="text" class="form-control"
+                           maxlength="50" [(ngModel)]="editandoRegiao.U_CodCordenador">
+                </div>
+                <div class="form-group col-sm-4">
+                    <label>Custo de transporte por unidade (R$)</label>
+                    <app-currency-input name="custoTransporteEditarRegiao" placeholder="R$ 0,00"
+                                        [(ngModel)]="editandoRegiao.U_CustoTransporte"></app-currency-input>
+                    <small class="form-text text-muted">
+                        Valor cobrado por unidade para trazer o produto da fábrica até a unidade dessa região.
+                        Soma no valor de cada faixa.
+                    </small>
+                </div>
+            </div>
+            <div *ngIf="selecionada && editandoRegiao.Code?.trim() && editandoRegiao.Code?.trim() != selecionada.Code"
+                 class="alert alert-warning">
+                O código é a chave da região no SAP: trocar de <b>{{selecionada.Code}}</b> para
+                <b>{{editandoRegiao.Code?.trim()}}</b> recria o cadastro com o novo código, levando junto
+                localidades, faixas de preço, filial e a situação atual.
+            </div>
+            <div class="text-right">
+                <button type="button" class="btn btn-outline-secondary mr-2" (click)="modalEditarRegiao.closeModal()">
+                    Cancelar
+                </button>
+                <button type="submit" class="btn btn-primary" [disabled]="salvandoCadastro">
+                    <i *ngIf="salvandoCadastro" class="fas fa-sync-alt fa-spin"></i>
+                    Salvar
+                </button>
+            </div>
+        </form>
+    </app-modal>
 
     <app-modal #modalAlterarFilial [title]="'Modificar Filial'" [modalSize]="'lg'">
         <div class="form-group">

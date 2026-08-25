@@ -29,6 +29,7 @@ import { ChangePassowrd } from './shared/components/change-password/change-passw
 import { ConfigService } from './core/services/config.service';
 import { PainelExpedicaoPedidosComponent } from './modulos/ordem-carregamento/componentes/painel-expedicao-pedidos/painel-expedicao-pedidos.component';
 import { PainelVendasComponent } from './modulos/painel-vendas/componentes/painel-vendas/painel-vendas.component';
+import { TicketFreteComponent } from './modulos/relatorio-frete/componentes/ticket-frete/ticket-frete.component';
 import { OrdemCarregamentoStatementComponent } from './modulos/ordem-carregamento/componentes/statement';
 import { PixPageComponent } from './modulos/financeiro/pix-page/pix-page.component';
 import { SapLinkButtonDemoComponent } from './shared/components/sap-link-button/sap-link-button-demo.component';
@@ -225,6 +226,13 @@ import { CobrancaDashboardComponent } from './modulos/cobranca/componentes/cobra
         data: ["icon:fas fa-calculator"],
         canActivate: [authGuard],
         component: CalculadoraStatementComponent,
+      },
+      {
+        path: 'ticket-frete',
+        title: 'Ticket Médio de Frete',
+        data: ["icon:fas fa-truck-moving"],
+        canActivate: [authGuard],
+        component: TicketFreteComponent
       },
     ]
   },

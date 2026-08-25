@@ -25,7 +25,7 @@ export class ComissaoService {
       .pipe(map(it => (it || []).map(c => this.toComissao(c))))
   }
 
-  get(code : number) : Observable<Comissao>{
+  get(code : string) : Observable<Comissao>{
     return this.hppCliente
       .get<Comissao>(this.url+"/"+code)
       .pipe(map(it => this.toComissao(it)))
@@ -45,7 +45,7 @@ export class ComissaoService {
       .pipe(map(it => this.toComissao(it)))
   }
 
-  atualizar(code : number, comissao : Partial<Comissao>) : Observable<Comissao>{
+  atualizar(code : string, comissao : Partial<Comissao>) : Observable<Comissao>{
     return this.hppCliente
       .patch<Comissao>(this.url+"/"+code, comissao)
       .pipe(map(it => this.toComissao(it)))
