@@ -26,6 +26,7 @@ export class OfflineQueueService {
 
   async initialize(): Promise<void> {
     await this.cleanup();
+    await this.recuperarTransmissoesInterrompidas();
     await this.refresh();
     this.context.state$.subscribe(state => {
       if (state.offlineEnabled && state.backendOnline && this.auth.isLoggedIn()) this.synchronize();
@@ -194,6 +195,34 @@ export class OfflineQueueService {
       transmittedAt: ['CREATED', 'APPROVED'].includes(response.status) ? Date.now() : record.transmittedAt,
       updatedAt: Date.now(),
     });
+  }
+
+  /**
+   * Devolve para PENDING as transmissões que ficaram presas em SYNCING.
+   *
+   * O `transmit` grava SYNCING no IndexedDB e só então dispara o POST. Se a aba for fechada,
+   * travar ou faltar energia entre as duas coisas, o registro fica SYNCING para sempre: o
+   * `runSynchronization` só consulta PENDING, e a tela não oferece editar, reenviar nem excluir
+   * para esse status — a cotação ficava impossível de transmitir e de recuperar.
+   *
+   * Roda no `initialize`, ou seja, num carregamento novo da aplicação: qualquer SYNCING
+   * encontrado aqui é de uma sessão anterior, porque esta aba ainda não transmitiu nada.
+   *
+   * Voltar para PENDING (em vez de tentar reconciliar antes) é seguro porque o backend é
+   * idempotente pelo `transmissionId`: o `sync` consulta o cache e, se não achar, procura
+   * documento com `U_offline_id` igual antes de criar qualquer coisa. Uma retransmissão devolve
+   * o documento que já existe em vez de duplicar a cotação. E não depende de rede: o registro
+   * volta a ser visível e editável mesmo com o backend fora do ar.
+   */
+  private async recuperarTransmissoesInterrompidas(): Promise<void> {
+    const interrompidas = await offlineDb.queue.where('status').equals('SYNCING').toArray();
+    if (interrompidas.length === 0) return;
+    const now = Date.now();
+    await offlineDb.queue.bulkPut(interrompidas.map(record => ({
+      ...record,
+      status: 'PENDING' as const,
+      updatedAt: now,
+    })));
   }
 
   private async cleanup(): Promise<void> {

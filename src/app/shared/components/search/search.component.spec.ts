@@ -1,4 +1,4 @@
-import { of } from 'rxjs';
+import { Subject, of, throwError } from 'rxjs';
 import { SearchComponent } from './search.component';
 import { Page } from '../../../sap/model/page.model';
 
@@ -78,6 +78,65 @@ describe('SearchComponent - selecao automatica de resultado unico', () => {
    * Paginando, a ultima pagina pode vir com um item so - nao e disso que se trata, e selecionar
    * ali trocaria a escolha do usuario no meio da navegacao.
    */
+  /**
+   * Duas buscas em voo disputavam o mesmo resultadoBusca. A resposta atrasada da PRIMEIRA chegava
+   * depois de a segunda ter limpado a lista, entrava como unico resultado e disparava a selecao
+   * automatica - escolhendo o registro da consulta errada.
+   */
+  it('descarta resposta atrasada de uma busca ja superada', () => {
+    const primeira = new Subject<Page<any>>();
+    const segunda = new Subject<Page<any>>();
+    const respostas = [primeira, segunda];
+    component.service = { search: () => respostas.shift()!.asObservable() } as any;
+
+    component.searchService('MAURO');
+    component.searchService('FRISACRE');
+
+    //a primeira responde DEPOIS da segunda ter comecado
+    primeira.next(pagina([{ CardCode: 'CLI-ERRADO' }]));
+
+    expect(selecionados).toEqual([]);
+    expect(component.resultadoBusca.content).toEqual([]);
+  });
+
+  it('a resposta da busca vigente continua valendo', () => {
+    const primeira = new Subject<Page<any>>();
+    const segunda = new Subject<Page<any>>();
+    const respostas = [primeira, segunda];
+    component.service = { search: () => respostas.shift()!.asObservable() } as any;
+
+    component.searchService('MAURO');
+    component.searchService('FRISACRE');
+
+    primeira.next(pagina([{ CardCode: 'CLI-ERRADO' }]));
+    segunda.next(pagina([{ CardCode: 'CLI-CERTO' }]));
+
+    expect(selecionados).toEqual([{ CardCode: 'CLI-CERTO' }]);
+  });
+
+  /** Pagina que chega depois de uma busca nova pertence a consulta antiga. */
+  it('descarta pagina atrasada quando uma busca nova comecou', () => {
+    const pagina2 = new Subject<Page<any>>();
+    const buscaNova = new Subject<Page<any>>();
+    const respostas = [pagina2, buscaNova];
+    component.service = { search: () => respostas.shift()!.asObservable() } as any;
+
+    component.changePageService('OX');
+    component.searchService('BOV');
+
+    pagina2.next(pagina([{ ItemCode: 'ANTIGO' }]));
+
+    expect(component.resultadoBusca.content).toEqual([]);
+  });
+
+  it('busca que falha nao deixa o loading ligado', () => {
+    component.service = { search: () => throwError(() => new Error('rede')) } as any;
+
+    component.searchService('OX');
+
+    expect(component.loading).toBeFalse();
+  });
+
   it('nao seleciona ao trocar de pagina, mesmo com um item na pagina', () => {
     comResultado(pagina([{ ItemCode: 'ULTIMO' }]));
 

@@ -17,7 +17,7 @@ describe('OfflineQueueService', () => {
       { getHost: () => 'http://backend' } as any,
       {} as any,
       context,
-      {} as any
+      { isLoggedIn: () => false } as any
     );
     await offlineDb.queue.clear();
   });
@@ -33,7 +33,10 @@ describe('OfflineQueueService', () => {
 
     expect(receipts.length).toBe(2);
     expect(new Set(receipts).size).toBe(2);
-    expect(saved.map(record => record.transmissionId)).toEqual(receipts);
+    //Sem ordem: o enqueue grava as duas com o MESMO createdAt, entao o orderBy empata e o Dexie
+    //desempata pela chave primaria, que e um uuid aleatorio. Comparar em ordem fazia o teste
+    //passar ou falhar por sorteio.
+    expect(saved.map(record => record.transmissionId).sort()).toEqual([...receipts].sort());
     expect(saved.map(record => record.total)).toEqual([25, 25]);
     expect(saved.every(record => record.status === 'PENDING')).toBeTrue();
     expect(saved.every(record => record.catalogId === 'catalog-1')).toBeTrue();
@@ -55,6 +58,45 @@ describe('OfflineQueueService', () => {
 
     expect(after.transmissionId).toBe(before.transmissionId);
     expect(after.total).toBe(20);
+  });
+
+  /**
+   * O transmit grava SYNCING no IndexedDB e so entao dispara o POST. Aba fechada, travada ou sem
+   * energia entre as duas coisas deixava o registro SYNCING para sempre: o runSynchronization so
+   * consulta PENDING, e a tela nao oferece editar, reenviar nem excluir nesse status.
+   */
+  it('devolve para PENDING transmissao interrompida por queda da aba', async () => {
+    const [transmissionId] = await service.enqueue([quotation('CLI001', 1, 10, 0)], 'Cliente');
+    const record = (await offlineDb.queue.toArray()).find(it => it.transmissionId === transmissionId);
+    await offlineDb.queue.update(record.localId, { status: 'SYNCING' });
+
+    await service.initialize();
+
+    expect((await offlineDb.queue.get(record.localId)).status).toBe('PENDING');
+  });
+
+  /** A retransmissao e segura: o backend deduplica pelo transmissionId, que e preservado. */
+  it('preserva o protocolo de transmissao ao recuperar', async () => {
+    const [transmissionId] = await service.enqueue([quotation('CLI001', 1, 10, 0)], 'Cliente');
+    const record = (await offlineDb.queue.toArray()).find(it => it.transmissionId === transmissionId);
+    await offlineDb.queue.update(record.localId, { status: 'SYNCING' });
+
+    await service.initialize();
+
+    expect((await offlineDb.queue.get(record.localId)).transmissionId).toBe(transmissionId);
+  });
+
+  it('nao mexe em registro que ja foi transmitido ou deu erro', async () => {
+    const receipts = await service.enqueue(
+      [quotation('CLI001', 1, 10, 0), quotation('CLI002', 1, 10, 0)], 'Cliente');
+    const registros = await offlineDb.queue.orderBy('createdAt').toArray();
+    await offlineDb.queue.update(registros[0].localId, { status: 'TRANSMITTED' });
+    await offlineDb.queue.update(registros[1].localId, { status: 'ERROR' });
+
+    await service.initialize();
+
+    expect((await offlineDb.queue.get(registros[0].localId)).status).toBe('TRANSMITTED');
+    expect((await offlineDb.queue.get(registros[1].localId)).status).toBe('ERROR');
   });
 
   function quotation(cardCode: string, quantity: number, unitPrice: number, freight: number): PedidoVenda {

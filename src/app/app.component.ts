@@ -65,9 +65,18 @@ export class AppComponent {
     })
     let backendWasOnline = this.offlineContext.backendOnline
     this.offlineContext.state$.subscribe(state => {
-      if(state.backendOnline && !backendWasOnline && this.authService.isLoggedIn()){
-        this.offlineCatalog.ensureCatalog()
-        this.offlineQueue.synchronize()
+      if(state.backendOnline && !backendWasOnline){
+        //Conectar aqui tambem, e nao so no boot: subindo com o backend fora do ar, o socket
+        //nunca era conectado. Este era o unico ponto do projeto que chamava connect(), entao as
+        //telas que dependem dele (calculadora de preco, home) ficavam esperando para sempre -
+        //o subscribe do WsService fica em polling de 50ms aguardando a conexao - e so um reload
+        //da aplicacao inteira resolvia. connect() e idempotente, entao chamar de novo nao cria
+        //uma segunda conexao.
+        this.wsService.connect(this.config.getWebSocket())
+        if(this.authService.isLoggedIn()){
+          this.offlineCatalog.ensureCatalog()
+          this.offlineQueue.synchronize()
+        }
       }
       backendWasOnline = state.backendOnline
     })
