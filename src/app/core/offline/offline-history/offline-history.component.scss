@@ -1,0 +1,31 @@
+.offline-history {
+  .summary {
+    border-bottom: 1px solid #dee2e6;
+    display: flex;
+    gap: 4px;
+    margin-bottom: 16px;
+    overflow-x: auto;
+  }
+
+  .summary button {
+    background: transparent;
+    border: 0;
+    border-bottom: 3px solid transparent;
+    color: #495057;
+    min-width: 130px;
+    padding: 10px 12px;
+    white-space: nowrap;
+  }
+
+  .summary button.active { border-bottom-color: var(--bs-primary); color: var(--bs-primary); font-weight: 600; }
+  .summary span { display: inline-block; font-size: 1.1rem; margin-right: 4px; }
+  code { font-size: 0.75rem; }
+  .actions { min-width: 116px; text-align: right; }
+  .actions .btn { height: 32px; margin-left: 4px; width: 32px; }
+  .status { border-radius: 4px; display: inline-block; font-size: 0.8rem; font-weight: 600; padding: 3px 7px; }
+  .status[data-status='PENDING'], .status[data-status='SYNCING'] { background: #fff3cd; color: #664d03; }
+  .status[data-status='ERROR'], .status[data-status='REJECTED'] { background: #f8d7da; color: #842029; }
+  .status[data-status='TRANSMITTED'] { background: #d1e7dd; color: #0f5132; }
+  .status[data-status='PENDING_AUTHORIZATION'] { background: #cff4fc; color: #055160; }
+  .error-row td { background: #fff5f5; color: #842029; }
+}

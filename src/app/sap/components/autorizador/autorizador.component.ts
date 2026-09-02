@@ -17,6 +17,11 @@ export class AutorizadorComponent implements OnInit {
   //form de nova linha (motivo -> usuario que autoriza esse motivo)
   novoAutorizador : any = { U_motivo: '', U_usuario: '' }
 
+  //motivos vindos do motor de regras do backend - antes o campo era texto livre e um erro de
+  //digitacao criava autorizador para motivo que nenhuma regra gera, deixando o documento
+  //pendente sem ninguem que pudesse aprovar
+  motivos : Array<string> = []
+
   definicaoLista : Array<Column> = [
     new Column('Motivo', 'U_motivo'),
     new Column('Usuário', 'U_usuario'),
@@ -27,6 +32,16 @@ export class AutorizadorComponent implements OnInit {
 
   ngOnInit(): void {
     this.carregar()
+    this.carregarMotivos()
+  }
+
+  private carregarMotivos(){
+    this.service.getMotivos().subscribe({
+      next : it => { this.motivos = it ?? [] },
+      //falha aqui nao pode travar a tela: a lista continua visivel e o cadastro fica indisponivel
+      //ate os motivos carregarem, em vez de voltar pro campo livre
+      error : () => { this.motivos = [] }
+    })
   }
 
   carregar(){

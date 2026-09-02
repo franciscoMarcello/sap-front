@@ -35,7 +35,7 @@ export class VendaFuturaStatementComponent implements OnInit, OnDestroy {
   definition = [
     new Column('ID', 'routerLinkContrato'),
     new Column('Pedido Origem', 'routerLinkPedidoOrigem'),
-    new Column('Nome', 'routerLinkPn'),
+    new Column('Nome', 'U_cardName').withWrap(),
     new Column('Vendedor', 'SalesEmployeeName'),
     new Column('Filial', 'filialFormatada'),
     new Column('Produtos', 'U_valorProdutosCurrency'),

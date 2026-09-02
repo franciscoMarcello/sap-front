@@ -15,8 +15,18 @@ export class BranchSelectComponent implements OnInit {
 
   }
 
+  private selectedValue : string | number | Branch = null
+  selectedBranch : Branch = null
+
   @Input()
-  selected : string | number = null
+  set selected(value : string | number | Branch){
+    this.selectedValue = value
+    this.recalculaSelecaoUnica()
+  }
+
+  get selected() : string | number | Branch {
+    return this.selectedValue
+  }
 
   @Input()
   multiple : boolean = false
@@ -64,6 +74,7 @@ export class BranchSelectComponent implements OnInit {
     this.service.get().subscribe(data => {
       this.branches = data;
       this.opcoes = data.map(it => new Option(it, this.descricaoDe(it)));
+      this.recalculaSelecaoUnica();
       this.recalculaPreSelecao();
       this.loading = false;
     })
@@ -73,6 +84,15 @@ export class BranchSelectComponent implements OnInit {
   // trocar a cada change detection zeraria o que o usuario acabou de marcar.
   private recalculaPreSelecao(){
     this.filiaisIniciais = this.branches.filter(it => this.estaPreSelecionada(it))
+  }
+
+  private recalculaSelecaoUnica(){
+    const selectedId = this.selectedValue instanceof Object
+      ? this.selectedValue.Bplid ?? this.selectedValue.BPLID
+      : this.selectedValue
+    this.selectedBranch = this.branches.find(branch =>
+      String(branch.Bplid ?? branch.BPLID) === String(selectedId)
+    ) ?? null
   }
 
   private estaPreSelecionada(branch : Branch){

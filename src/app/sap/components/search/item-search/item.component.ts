@@ -35,7 +35,10 @@ export class ItemSearchComponent implements OnInit {
   }
 
   ngOnInit(): void {
-    this.service = new ItemServiceBanch(this.itemService,this.branchId)
+    //funcao, nao o valor: o ItemServiceBanch e criado uma vez so, e copiar o branchId aqui
+    //congelava a filial do ngOnInit. Trocar de filial na tela continuava buscando produto da
+    //filial antiga, e a busca nunca mais voltava resultado.
+    this.service = new ItemServiceBanch(this.itemService, () => this.branchId)
   }
 
   contentSelectedFun($event){
@@ -45,11 +48,11 @@ export class ItemSearchComponent implements OnInit {
 }
 
 class ItemServiceBanch implements SearchService<Item> {
-  
-  constructor(private service : ItemService, private branchId){
+
+  constructor(private service : ItemService, private branchId : () => any){
   }
 
   search($event: any): Observable<Page<Item>> {
-    return this.service.search($event,this.branchId)
+    return this.service.search($event,this.branchId())
   }
 }

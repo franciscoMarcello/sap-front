@@ -26,6 +26,14 @@ export class ItensComponent implements OnInit {
   @Input()
   title = "Produtos"
 
+  @Input()
+  set initialItems(value: Array<Item>) {
+    if(value && value !== this.itens) {
+      this.itens = value
+      this.itens.forEach(item => this.carregarComissao(item.PriceList))
+    }
+  }
+
   @Output()
   changeItens = new EventEmitter<Array<Item>>();
 

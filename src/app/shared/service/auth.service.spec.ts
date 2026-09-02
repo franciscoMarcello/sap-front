@@ -24,7 +24,19 @@ describe('AuthService — roles do token', () => {
     localStorage.removeItem('token');
   });
 
-  afterEach(() => localStorage.removeItem('token'));
+  afterEach(() => {
+    localStorage.removeItem('token');
+    delete (window as any)['auth-config'];
+  });
+
+  it('le do backend se o recurso offline esta habilitado', () => {
+    (window as any)['auth-config'] = { mode: 'internal', offlineEnabled: true };
+
+    expect(service.isOfflineEnabled()).toBeTrue();
+
+    (window as any)['auth-config'] = { mode: 'internal', offlineEnabled: false };
+    expect(service.isOfflineEnabled()).toBeFalse();
+  });
 
   it('lê realm_access e resource_access do token do Keycloak', () => {
     localStorage.setItem('token', fakeToken({
@@ -68,5 +80,17 @@ describe('AuthService — roles do token', () => {
     localStorage.setItem('token', 'nao-e-um-jwt');
 
     expect(service.getRoles()).toEqual([]);
+  });
+
+  it('considera token expirado como sessao indisponivel', () => {
+    localStorage.setItem('token', fakeToken({ exp: Math.floor(Date.now() / 1000) - 60 }));
+
+    expect(service.isLoggedIn()).toBeFalse();
+  });
+
+  it('usa sap_code como identificador offline estavel antes do jti', () => {
+    localStorage.setItem('token', fakeToken({ sap_code: '55', jti: 'token-que-muda', sub: 'kc-user' }));
+
+    expect(service.getOfflineUserId()).toBe('55');
   });
 });

@@ -21,13 +21,12 @@
 
 .scrolls{
   max-height: 70vh;
-  overflow-x: scroll;
+  overflow-x: auto;
 }
 
 // .scrolls tem altura máxima com scroll vertical (via overflow-y: auto implícito,
-// regra do CSS quando overflow-x != visible) - sem isso o cabeçalho rola junto com
-// as linhas e some. z-index acima do .sticky-column pra continuar por cima dele
-// no canto onde os dois se cruzam.
+// regra do CSS quando overflow-x != visible). O eixo horizontal usa auto para a barra
+// aparecer somente quando outras colunas realmente não couberem.
 thead th {
   position: sticky;
   top: 0;
@@ -44,4 +43,12 @@ thead th.sticky-column {
 
 td{
   padding: 0.4rem;
+}
+
+td.table-cell-wrap {
+  width: 18rem;
+  max-width: 18rem;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }

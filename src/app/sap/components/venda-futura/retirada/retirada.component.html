@@ -3,8 +3,26 @@
         <div class="row">
             <div class="col">
                 <form>
+                    <!-- A entrega pode ir para outro endereco do cliente, desde que caia na mesma
+                         regiao de frete do contrato: o back recusa se cair em outra, porque o
+                         frete foi negociado para aquele destino. -->
                     <div class="form-group">
-                        <app-select #selectComponent [options]="filteredItems" 
+                        <app-select *ngIf="enderecosEntrega.length > 0"
+                            [label]="'Endereço de entrega'"
+                            [initialSelect]="enderecoEntrega"
+                            [options]="enderecosEntrega"
+                            (selectedOut)="selecionaEndereco($event)">
+                        </app-select>
+                        <small *ngIf="carregandoEnderecos" class="text-muted d-block">
+                            <i class="fas fa-sync fa-spin"></i> Carregando endereços...
+                        </small>
+                        <small *ngIf="!carregandoEnderecos && enderecosEntrega.length == 0" class="text-danger d-block">
+                            O cliente não possui endereço de entrega cadastrado.
+                        </small>
+                    </div>
+
+                    <div class="form-group">
+                        <app-select #selectComponent [options]="filteredItems"
                             [label]="'Item'" 
                             (selectedOut)="selecionado($event)">
                         </app-select>

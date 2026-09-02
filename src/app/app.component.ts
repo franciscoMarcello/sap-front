@@ -8,6 +8,10 @@ import { Title } from '@angular/platform-browser';
 import { ConfigService } from './core/services/config.service';
 import { WsService } from './shared/WsService';
 import { NavigationEnd, Router } from '@angular/router';
+import { OfflineContextService } from './core/offline/offline-context.service';
+import { OfflineCatalogService } from './core/offline/offline-catalog.service';
+import { OfflineQueueService } from './core/offline/offline-queue.service';
+import { AuthService } from './shared/service/auth.service';
 
 @Component({
   selector: 'app-root',
@@ -28,9 +32,13 @@ export class AppComponent {
     private config : ConfigService,
     private wsService: WsService,
     private router: Router,
+    public offlineContext: OfflineContextService,
+    private offlineCatalog: OfflineCatalogService,
+    private offlineQueue: OfflineQueueService,
+    private authService: AuthService,
     private store: Store<AppState>) {}
 
-  ngOnInit() {
+  async ngOnInit() {
     this.changeColors()
 
     this.titleService.setTitle(this.config.title)
@@ -42,7 +50,30 @@ export class AppComponent {
       }
     });
 
-    this.wsService.connect(this.config.getWebSocket());
+    await this.offlineContext.initialize();
+    await this.offlineQueue.initialize();
+    if (this.offlineContext.backendOnline && this.authService.isLoggedIn()) {
+      await this.offlineContext.restoreOnlineSession();
+      this.offlineCatalog.ensureCatalog();
+    }
+    this.authService.loginChange$.subscribe(async () => {
+      if(this.authService.isLoggedIn() && this.offlineContext.backendOnline){
+        await this.offlineContext.restoreOnlineSession()
+        this.offlineCatalog.ensureCatalog()
+        this.offlineQueue.synchronize()
+      }
+    })
+    let backendWasOnline = this.offlineContext.backendOnline
+    this.offlineContext.state$.subscribe(state => {
+      if(state.backendOnline && !backendWasOnline && this.authService.isLoggedIn()){
+        this.offlineCatalog.ensureCatalog()
+        this.offlineQueue.synchronize()
+      }
+      backendWasOnline = state.backendOnline
+    })
+
+    if (this.offlineContext.backendOnline)
+      this.wsService.connect(this.config.getWebSocket());
     
     this.ui = this.store.select('ui');
     this.renderer.removeClass(

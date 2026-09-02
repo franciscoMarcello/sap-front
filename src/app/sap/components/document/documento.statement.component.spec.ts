@@ -1,85 +1,134 @@
-import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { Item } from '../../model/item';
+import { of, throwError } from 'rxjs';
+import { DocumentStatementComponent } from './documento.statement.component';
 
-describe('Item', () => {
-  let item: Item;
+/**
+ * O valor do frete na tela nao pode sobreviver a uma mudanca no pedido. Antes, durante o
+ * recalculo o campo seguia exibindo o valor anterior como se fosse o vigente - e se a chamada
+ * falhasse ou nunca voltasse, um numero irreal ficava travado na tela e entrava no total.
+ */
+describe('DocumentStatementComponent - frete confiavel na tela', () => {
+
+  let component: DocumentStatementComponent;
+  let regiaoService: any;
+
+  function item(quantidade : number) {
+    return { quantidade, unitPriceLiquid: () => 10, PriceList: 1, GroupNum: 1 } as any;
+  }
+
+  function regiaoQueCalcula(total : number) {
+    return [{ ativa: true, U_Filial: 2, calcularFrete: () => ({ total }) }];
+  }
 
   beforeEach(() => {
-    item = new Item();
+    regiaoService = { getByLocalidade: () => of(regiaoQueCalcula(500)) };
+    component = new DocumentStatementComponent(
+      {} as any, {} as any, {} as any, regiaoService,
+      { get: () => of({ Code: '20', Name: 'MANICORE' }) } as any,
+      { tipoOperacao: [] } as any, {} as any, {} as any,
+      { snapshot: { queryParamMap: { get: () => null } } } as any,
+      { backendOnline: true, hasValidCatalog: false } as any,
+      {} as any, {} as any);
+    component.ngOnInit();
+
+    component.tipoEnvio = 'ent';
+    component.branchId = 2;
+    component.businesPartner = { CardCode: 'CLI001' } as any;
+    component.enderecoEntrega = { AddressName: 'ENTREGA', U_Localidade: 20 } as any;
+    component.itens = [item(10)];
   });
 
-  it('desconto 1', () => { 
-    let item = new Item();
+  /** Estado inicial: nada calculado ainda, entao nao ha valor para mostrar. */
+  it('nasce sem frete confirmado', () => {
+    expect(component.freteCalculado).toBeFalse();
+  });
 
-    item.UnitPrice = 32141.76;
-    item.jurosCondicaoPagamento = 0;
-    item.quantidade = 3242;
-    item.descontoCondicaoPagamento = 11; 
+  it('invalida o valor assim que um recalculo comeca', () => {
+    component.changeItens([item(10)]);
+    expect(component.freteCalculado).toBeFalse();
+  });
 
-    let precoUnitarioEsperado = item.unitPriceLiquid();
-    let resultado = item.totalSemFormatacao();
+  it('zera o frete quando o pedido fica sem itens, em vez de manter o valor antigo', () => {
+    component.changeItens([]);
 
-    expect('28606.17').toBe(precoUnitarioEsperado.toString()); 
-    expect('92741203.14').toBe(resultado.toString()); 
-});
+    expect(component.frete).toEqual(0);
+    expect(component.freteCalculado).toBeTrue();
+  });
 
-it('desconto 2', () => { 
-  let item = new Item();
+  it('zera o frete ao voltar para retirada', () => {
+    component.tipoEnvio = 'ret';
+    component.changeItens([item(10)]);
 
-  item.UnitPrice = 98754.23;
-  item.jurosCondicaoPagamento = 0;
-  item.quantidade = 324252;
-  item.descontoCondicaoPagamento = 12; 
+    expect(component.frete).toEqual(0);
+    expect(component.freteCalculado).toBeTrue();
+  });
 
-  let precoUnitarioEsperado = item.unitPriceLiquid();
-  let resultado = item.totalSemFormatacao();
+  it('nao soma frete nao confirmado no total', () => {
+    component.frete = 500;
+    component.freteCalculado = false;
 
-  expect('86903.72').toBe(precoUnitarioEsperado.toString()); 
-  expect('28178705017.44').toBe(resultado.toString()); 
-});
+    expect(component.total()).toEqual(100);
+  });
 
-it('juros', () => { 
-  let item = new Item();
+  it('soma o frete no total depois de confirmado', () => {
+    component.frete = 500;
+    component.freteCalculado = true;
 
-  item.UnitPrice = 54783.32;
-  item.jurosCondicaoPagamento = 8;
-  item.quantidade = 75654;
-  item.descontoCondicaoPagamento = 0; 
+    expect(component.total()).toEqual(600);
+  });
 
-  let precoUnitarioEsperado = item.unitPriceLiquid();
-  let resultado = item.totalSemFormatacao();
+  /**
+   * O pedido e quebrado em um documento por condicao de pagamento. Antes cada documento levava o
+   * frete CHEIO - o cliente era cobrado duas vezes quando havia duas condicoes.
+   */
+  it('rateia o frete entre os documentos, sem duplicar', () => {
+    component.frete = 300;
+    component.freteCalculado = true;
+    component.itens = [
+      { ...item(10), GroupNum: 'A' } as any,
+      { ...item(20), GroupNum: 'B' } as any,
+    ];
 
-  expect('59165.99').toBe(precoUnitarioEsperado.toString()); 
-  expect('4476143807.46').toBe(resultado.toString()); 
-});
+    const fretes = (component as any).rateiaFrete(component.agruparPorGroupNum());
 
-it('juros 2', () => { 
-  let item = new Item();
+    expect(fretes).toEqual([100, 200]);
+    expect(fretes.reduce((a, b) => a + b, 0)).toEqual(300);
+  });
 
-  item.UnitPrice = 164.32;
-  item.jurosCondicaoPagamento = 11;
-  item.quantidade = 101;
-  item.descontoCondicaoPagamento = 0; 
+  /** A sobra de centavos vai para o primeiro, para a soma fechar com o frete calculado. */
+  it('sobra de centavos nao some no rateio', () => {
+    component.frete = 100;
+    component.freteCalculado = true;
+    component.itens = [
+      { ...item(1), GroupNum: 'A' } as any,
+      { ...item(1), GroupNum: 'B' } as any,
+      { ...item(1), GroupNum: 'C' } as any,
+    ];
 
-  let precoUnitarioEsperado = item.unitPriceLiquid();
-  let resultado = item.totalSemFormatacao();
+    const fretes = (component as any).rateiaFrete(component.agruparPorGroupNum());
 
-  expect('182.40').toBe(precoUnitarioEsperado.toString()); 
-  expect('18422.40').toBe(resultado.toString()); 
-});
+    expect(fretes.reduce((a, b) => a + b, 0)).toEqual(100);
+  });
 
-it('mais o segundo desconto', () => { 
-  let item = new Item();
+  it('nao rateia frete nao confirmado', () => {
+    component.frete = 300;
+    component.freteCalculado = false;
+    component.itens = [{ ...item(10), GroupNum: 'A' } as any];
 
-  item.UnitPrice = 162.59;
-  item.jurosCondicaoPagamento = 0;
-  item.descontoCondicaoPagamento = 11; 
-  item.quantidade = 101;
-  
-  let precoUnitarioEsperado = item.unitPriceLiquid();
-  let resultado = item.totalSemFormatacao();
+    expect((component as any).rateiaFrete(component.agruparPorGroupNum())).toEqual([0]);
+  });
 
-  expect('144.71').toBe(precoUnitarioEsperado.toString()); 
-  expect('14615.71').toBe(resultado.toString()); 
-});
+  /** Falha na busca da regiao tem que virar zero + erro, nunca deixar o valor anterior. */
+  it('nao mantem o valor anterior quando a busca de regiao falha', (done) => {
+    component.frete = 500;
+    component.freteCalculado = true;
+    regiaoService.getByLocalidade = () => throwError(() => new Error('rede'));
+
+    component.changeItens([item(10)]);
+
+    setTimeout(() => {
+      expect(component.frete).toEqual(0);
+      expect(component.freteErro).toBeTruthy();
+      done();
+    }, 500);
+  });
 });

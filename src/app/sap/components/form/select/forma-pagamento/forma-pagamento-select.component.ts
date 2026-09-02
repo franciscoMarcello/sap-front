@@ -1,15 +1,13 @@
-import { Component, EventEmitter, Input, OnChanges, OnInit, Output, SimpleChanges, ViewChild } from '@angular/core';
+import { Component, EventEmitter, Input, OnChanges, Output, SimpleChanges } from '@angular/core';
 import { Option } from '../../../../model/form/option';
-import { CityService } from '../../../../service/addresses/city.service';
 import { FormaPagamentoService } from '../../../../service/forma-pagamento.service';
-import { SelectComponent } from '../../../../../shared/components/select/select.component';
 
 
 @Component({
   selector: 'app-forma-pagamento-select',
   templateUrl: './forma-pagamento-select.component.html'
 })
-export class FormaPagamentoSelectComponent implements OnInit, OnChanges {
+export class FormaPagamentoSelectComponent implements OnChanges {
 
   constructor(private service : FormaPagamentoService){
       
@@ -24,14 +22,13 @@ export class FormaPagamentoSelectComponent implements OnInit, OnChanges {
   @Input()
   cardCode : string = null
 
-  @ViewChild('selectComponent', {static: true}) selectComponent: SelectComponent;
-  
   opcoes : Array<Option> = [
     new Option("AVISTA","DEPOSITO"),
     new Option("BB-RC-BOL-1199","BOLETO")
   ]
 
   loading = false
+  private requestSequence = 0
 
   @Output()
   selectedOut = new EventEmitter<string>();
@@ -40,21 +37,43 @@ export class FormaPagamentoSelectComponent implements OnInit, OnChanges {
     this.selectedOut.emit($event)
   }
 
-  ngOnInit(): void {
-    this.getCondicoes()
-  }  
-
   ngOnChanges(changes: SimpleChanges): void {
-    this.getCondicoes()
+    if(changes['idFilial'] || changes['cardCode'])
+      this.getCondicoes()
   }
 
   getCondicoes(){
-    this.loading = true
-    this.service.getCondicoes(this.idFilial,this.cardCode).subscribe(it => {
-      this.selectComponent.unselect()
-      this.opcoes = it.map(it => new Option(it.PayMethCod,it.Description))
+    const requestId = ++this.requestSequence
+    if(this.idFilial == null || !this.cardCode){
+      this.opcoes = []
       this.loading = false
+      this.clearInvalidSelection()
+      return
+    }
+
+    this.loading = true
+    this.service.getCondicoes(this.idFilial,this.cardCode).subscribe({
+      next: it => {
+        if(requestId != this.requestSequence) return
+        this.opcoes = it.map(it => new Option(it.PayMethCod,it.Description))
+        const selectionIsValid = this.opcoes.some(option => String(option.value) == String(this.selected))
+        if(!selectionIsValid)
+          this.clearInvalidSelection()
+        this.loading = false
+      },
+      error: () => {
+        if(requestId != this.requestSequence) return
+        this.opcoes = []
+        this.clearInvalidSelection()
+        this.loading = false
+      }
     })
+  }
+
+  private clearInvalidSelection(){
+    if(this.selected == null || this.selected === '') return
+    this.selected = null
+    this.selectedOut.emit(null)
   }
 
 }

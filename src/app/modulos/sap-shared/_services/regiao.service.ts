@@ -1,9 +1,11 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable } from '@angular/core';
-import { Observable, map } from 'rxjs';
+import { Observable, from, map } from 'rxjs';
 import { ConfigService } from '../../../core/services/config.service';
 import { Regiao } from '../../../sap/model/regiao/regiao';
 import { Page } from '../../../sap/model/page.model';
+import { OfflineContextService } from '../../../core/offline/offline-context.service';
+import { OfflineCatalogRepository } from '../../../core/offline/offline-catalog.repository';
 
 @Injectable({
   providedIn: 'root'
@@ -12,7 +14,8 @@ export class RegiaoService {
 
   url = "http://localhost:8080/regioes"
 
-  constructor(private config : ConfigService, private hppCliente : HttpClient) {
+  constructor(private config : ConfigService, private hppCliente : HttpClient,
+    private offline: OfflineContextService, private catalog: OfflineCatalogRepository) {
     this.url = config.getHost()+"/regioes"
   }
 
@@ -50,12 +53,18 @@ export class RegiaoService {
   }
 
   get(code : string) : Observable<Regiao>{
+    if(this.offline.shouldUseOfflineData)
+      return from(this.catalog.get('freightRegions', code)).pipe(map(it => this.toRegiao(it)))
     return this.hppCliente
       .get<Regiao>(this.url+"/"+code)
       .pipe(map(it => this.toRegiao(it)))
   }
 
   getByLocalidade(codLocalidade : string) : Observable<Array<Regiao>>{
+    if(this.offline.shouldUseOfflineData)
+      return from(this.catalog.all('freightRegions')).pipe(map(values => values
+        .map(it => this.toRegiao(it))
+        .filter(regiao => regiao.getLocalidades().some(localidade => String(localidade) === String(codLocalidade)))))
     return this.hppCliente
       .get<Array<Regiao>>(this.url+"/localidade/"+codLocalidade)
       .pipe(map(it => (it || []).map(r => this.toRegiao(r))))

@@ -138,4 +138,12 @@ describe('Branch select component', () => {
 
     expect(recemCriado.filiaisIniciais).toEqual([filiais[0]]);
   });
+
+  it('resolve a selecao unica por id mesmo quando o objeto veio do IndexedDB', () => {
+    component.selected = Object.assign(new Branch(), { Bplid: '7', Bplname: 'copia local' });
+
+    fixture.detectChanges();
+
+    expect(component.selectedBranch).toBe(filiais[1]);
+  });
 });
