@@ -77,44 +77,65 @@ describe('DocumentStatementComponent - frete confiavel na tela', () => {
   });
 
   /**
-   * O pedido e quebrado em um documento por condicao de pagamento. Antes cada documento levava o
-   * frete CHEIO - o cliente era cobrado duas vezes quando havia duas condicoes.
+   * Faixa de preco por quantidade: ate 99 itens custa R$ 10/un, de 100 em diante R$ 5/un.
+   * 60 + 40 somam 100 e alcancam a faixa barata que nenhum dos dois grupos atinge sozinho.
    */
-  it('rateia o frete entre os documentos, sem duplicar', () => {
-    component.frete = 300;
-    component.freteCalculado = true;
+  function regiaoComFaixas() {
+    return {
+      ativa: true,
+      U_Filial: 2,
+      calcularFrete: (_cod: string, quantidade: number) =>
+        ({ total: quantidade * (quantidade >= 100 ? 5 : 10) }),
+    } as any;
+  }
+
+  /**
+   * O frete de cada documento tem que sair da quantidade DAQUELE grupo. Ratear o frete combinado
+   * aplicava a faixa dos 100 itens aos dois documentos, e o backend - que revalida cada documento
+   * sozinho, com 60 e com 40 - nao reproduz esse valor: os documentos seriam recusados.
+   */
+  it('calcula o frete de cada documento pela quantidade do proprio grupo', () => {
+    (component as any).regiaoFrete = regiaoComFaixas();
+    (component as any).localidadeFrete = '20';
     component.itens = [
-      { ...item(10), GroupNum: 'A' } as any,
-      { ...item(20), GroupNum: 'B' } as any,
+      { ...item(60), GroupNum: 'A' } as any,
+      { ...item(40), GroupNum: 'B' } as any,
     ];
 
-    const fretes = (component as any).rateiaFrete(component.agruparPorGroupNum());
+    const grupos = Array.from(component.agruparPorGroupNum().values());
+    const fretes = grupos.map(itens => (component as any).freteDoGrupo(itens));
 
-    expect(fretes).toEqual([100, 200]);
-    expect(fretes.reduce((a, b) => a + b, 0)).toEqual(300);
+    //60 x 10 e 40 x 10 - cada um na sua faixa, nao na faixa dos 100 combinados
+    expect(fretes).toEqual([600, 400]);
   });
 
-  /** A sobra de centavos vai para o primeiro, para a soma fechar com o frete calculado. */
-  it('sobra de centavos nao some no rateio', () => {
-    component.frete = 100;
-    component.freteCalculado = true;
+  /** O total exibido tem que ser o que sera cobrado de verdade, nao o do pedido combinado. */
+  it('o total do frete e a soma do que cada documento vai cobrar', () => {
+    (component as any).regiaoFrete = regiaoComFaixas();
+    (component as any).localidadeFrete = '20';
     component.itens = [
-      { ...item(1), GroupNum: 'A' } as any,
-      { ...item(1), GroupNum: 'B' } as any,
-      { ...item(1), GroupNum: 'C' } as any,
+      { ...item(60), GroupNum: 'A' } as any,
+      { ...item(40), GroupNum: 'B' } as any,
     ];
 
-    const fretes = (component as any).rateiaFrete(component.agruparPorGroupNum());
-
-    expect(fretes.reduce((a, b) => a + b, 0)).toEqual(100);
+    //combinado seria 100 x 5 = 500; dividido, sao 1000
+    expect((component as any).somaDoFretePorGrupo()).toEqual(1000);
   });
 
-  it('nao rateia frete nao confirmado', () => {
-    component.frete = 300;
-    component.freteCalculado = false;
+  /** Sem divisao, um grupo so: o frete e o da quantidade inteira. */
+  it('pedido em um documento so usa a faixa da quantidade total', () => {
+    (component as any).regiaoFrete = regiaoComFaixas();
+    (component as any).localidadeFrete = '20';
+    component.itens = [{ ...item(100), GroupNum: 'A' } as any];
+
+    expect((component as any).somaDoFretePorGrupo()).toEqual(500);
+  });
+
+  it('sem regiao resolvida o frete do grupo e zero', () => {
+    (component as any).regiaoFrete = null;
     component.itens = [{ ...item(10), GroupNum: 'A' } as any];
 
-    expect((component as any).rateiaFrete(component.agruparPorGroupNum())).toEqual([0]);
+    expect((component as any).freteDoGrupo(component.itens)).toEqual(0);
   });
 
   /** Falha na busca da regiao tem que virar zero + erro, nunca deixar o valor anterior. */

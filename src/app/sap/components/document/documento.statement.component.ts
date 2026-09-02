@@ -18,6 +18,7 @@ import { BranchSelectComponent } from '../../../modulos/sap-shared/componentes/b
 import { PedidoVenda } from '../../model/document/pedido-venda.model';
 import { LocalidadeService } from '../../../modulos/sap-shared/_services/localidade.service';
 import { RegiaoService } from '../../../modulos/sap-shared/_services/regiao.service';
+import { Regiao } from '../../model/regiao/regiao';
 import { ActivatedRoute } from '@angular/router';
 import { OfflineContextService } from '../../../core/offline/offline-context.service';
 import { OfflineQueueService } from '../../../core/offline/offline-queue.service';
@@ -60,6 +61,13 @@ export class DocumentStatementComponent implements OnInit {
   //e sem isso o botao sumiria no meio da propria acao do usuario.
   retentandoFrete = false
   freteErro : string = null
+  //Regiao e localidade resolvidas no ultimo calculo de frete. Guardadas porque o frete de cada
+  //documento gerado precisa ser recalculado com a quantidade daquele grupo - a faixa de preco
+  //depende da quantidade, entao ratear o valor combinado gera um numero que o backend nao
+  //reproduz ao revalidar o documento sozinho.
+  private regiaoFrete : Regiao = null
+  private localidadeFrete : string = null
+
   //nome da localidade vinculada ao endereco de entrega, exibido na tela: so o codigo (ou nada)
   //obriga a pessoa a ir garimpar no cadastro do cliente pra saber qual vinculo esta valendo
   localidadeEntrega : string = null
@@ -112,11 +120,15 @@ export class DocumentStatementComponent implements OnInit {
       const regiao = regioes.find(it => it.ativa && it.U_Filial == params.filial)
       const resultado = regiao?.calcularFrete(params.codLocalidade, params.quantidade)
       if(!resultado){
+        this.regiaoFrete = null
         this.defineFrete(0)
         this.freteErro = 'Não foi possível calcular o frete para a localidade do cliente (nenhuma região de frete ativa cobre essa localidade para a filial selecionada).'
         return
       }
-      this.defineFrete(resultado.total)
+      //guardados para calcular o frete de cada documento gerado (ver freteDoGrupo)
+      this.regiaoFrete = regiao
+      this.localidadeFrete = params.codLocalidade
+      this.defineFrete(this.somaDoFretePorGrupo())
     })
 
     const editId = this.route.snapshot.queryParamMap.get('offlineEdit')
@@ -436,8 +448,6 @@ export class DocumentStatementComponent implements OnInit {
   private buildDocuments() : Array<PedidoVenda> {
     const documents = new Array<PedidoVenda>()
     const grupos = this.agruparPorGroupNum()
-    const fretePorGrupo = this.rateiaFrete(grupos)
-    let indice = 0
     grupos.forEach((itens,groupNum) => {
       const order = new PedidoVenda()
       order.CardCode = this.businesPartner.CardCode
@@ -448,7 +458,9 @@ export class DocumentStatementComponent implements OnInit {
       order.Comments = this.observacao
       order.DocDueDate = this.dtEntrega
       order.shipToCode = this.tipoEnvio == 'ent' ? this.enderecoEntrega?.AddressName : null
-      order.Frete = fretePorGrupo[indice++]
+      //frete da quantidade DESTE grupo, nao um rateio do combinado - e o unico valor que o
+      //backend consegue reproduzir ao revalidar o documento sozinho
+      order.Frete = this.freteDoGrupo(itens)
       order.TaxExtension = {
         VehicleState: this.setVehicleState(),
         Incoterms: this.tipoEnvio == 'ret' ? 9 : 0
@@ -459,26 +471,31 @@ export class DocumentStatementComponent implements OnInit {
   }
 
   /**
-   * O frete e calculado uma vez para o pedido inteiro, mas o pedido pode ser quebrado em varios
-   * documentos por condicao de pagamento. Antes, cada documento levava o frete CHEIO - o cliente
-   * era cobrado duas vezes quando havia duas condicoes.
+   * Frete de UM documento, calculado com a quantidade daquele grupo.
    *
-   * Rateia proporcional a quantidade de cada grupo, que e a mesma base do calculo do frete
-   * (a formula da regiao multiplica pela quantidade). A sobra de centavos vai para o primeiro
-   * documento, para a soma dos rateios fechar exatamente com o frete calculado.
+   * Nao pode ser rateio do frete combinado. O `Regiao.encontraFaixa` escolhe a tarifa por faixa
+   * de quantidade: 60 + 40 itens somam 100 e podem alcancar uma faixa mais barata que nenhum dos
+   * dois grupos atinge sozinho. Cada documento e postado separadamente, com apenas as linhas do
+   * seu grupo, e o backend revalida usando a quantidade DAQUELE documento - um valor rateado da
+   * faixa combinada e irreproduzivel ali, e o documento seria recusado ou cobrado errado.
    */
-  private rateiaFrete(grupos : Map<string, Item[]>) : Array<number> {
-    const quantidades = Array.from(grupos.values())
-      .map(itens => itens.reduce((acc,it) => acc + (Number(it.quantidade) || 0), 0))
-    const total = quantidades.reduce((acc,q) => acc + q, 0)
+  private freteDoGrupo(itens : Item[]) : number {
+    if(!this.regiaoFrete || !this.localidadeFrete)
+      return 0
+    const quantidade = itens.reduce((acc,it) => acc + (Number(it.quantidade) || 0), 0)
+    return this.regiaoFrete.calcularFrete(this.localidadeFrete, quantidade)?.total ?? 0
+  }
 
-    if(!this.freteCalculado || !this.frete || total <= 0)
-      return quantidades.map(() => 0)
-
-    const centavos = Math.round(this.frete * 100)
-    const rateio = quantidades.map(q => Math.floor(centavos * q / total))
-    rateio[0] += centavos - rateio.reduce((acc,c) => acc + c, 0)
-    return rateio.map(c => c / 100)
+  /**
+   * Frete total do pedido: a soma do que cada documento vai cobrar de verdade.
+   *
+   * Nao e o frete da quantidade combinada. Quando o pedido se quebra por condicao de pagamento,
+   * cada documento cai na faixa da sua propria quantidade - exibir o valor combinado mostraria
+   * na tela um total menor do que o cliente vai pagar.
+   */
+  private somaDoFretePorGrupo() : number {
+    return Array.from(this.agruparPorGroupNum().values())
+      .reduce((acc, itens) => acc + this.freteDoGrupo(itens), 0)
   }
 
   private async saveOffline(documents : Array<PedidoVenda>){

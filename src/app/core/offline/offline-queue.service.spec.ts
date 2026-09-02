@@ -99,6 +99,62 @@ describe('OfflineQueueService', () => {
     expect((await offlineDb.queue.get(registros[1].localId)).status).toBe('ERROR');
   });
 
+  /**
+   * O IndexedDB e do NAVEGADOR, nao do usuario. Numa maquina compartilhada, o segundo usuario
+   * abria uma URL /venda/document?offlineEdit=... esquecida pelo primeiro e via cliente, itens,
+   * precos e observacoes de outra pessoa - alem de poder editar e apagar.
+   */
+  describe('isolamento entre usuarios do mesmo navegador', () => {
+
+    let localIdDoOutro: string;
+
+    beforeEach(async () => {
+      await service.enqueue([quotation('CLI-DO-OUTRO', 1, 10, 0)], 'Cliente do outro');
+      localIdDoOutro = (await offlineDb.queue.toArray())[0].localId;
+      //o outro usuario faz login na mesma maquina
+      context.currentOwnerKey = () => 'http://backend::99';
+    });
+
+    it('nao devolve cotacao de outro usuario', async () => {
+      expect(await service.get(localIdDoOutro)).toBeUndefined();
+    });
+
+    it('nao edita cotacao de outro usuario', async () => {
+      await service.edit(localIdDoOutro, quotation('CLI-INVASOR', 5, 10, 0), 'Invasor');
+
+      const record = await offlineDb.queue.get(localIdDoOutro);
+      expect(record.quotation.CardCode).toBe('CLI-DO-OUTRO');
+      expect(record.customerName).toBe('Cliente do outro');
+    });
+
+    it('nao apaga cotacao de outro usuario', async () => {
+      await service.remove(localIdDoOutro);
+
+      expect(await offlineDb.queue.get(localIdDoOutro)).toBeDefined();
+    });
+
+    it('nao reenvia cotacao de outro usuario', async () => {
+      await offlineDb.queue.update(localIdDoOutro, { status: 'ERROR', lastError: 'falhou' });
+
+      await service.retry(localIdDoOutro);
+
+      expect((await offlineDb.queue.get(localIdDoOutro)).status).toBe('ERROR');
+    });
+
+    it('o dono continua acessando a propria cotacao', async () => {
+      context.currentOwnerKey = () => 'http://backend::55';
+
+      expect(await service.get(localIdDoOutro)).toBeDefined();
+    });
+
+    /** Sessao ausente ou expirada: negar e o padrao seguro. */
+    it('sem sessao nao devolve nada', async () => {
+      context.currentOwnerKey = () => null;
+
+      expect(await service.get(localIdDoOutro)).toBeUndefined();
+    });
+  });
+
   function quotation(cardCode: string, quantity: number, unitPrice: number, freight: number): PedidoVenda {
     return Object.assign(new PedidoVenda(), {
       CardCode: cardCode,

@@ -58,7 +58,25 @@ export class OfflineQueueService {
     return records.map(record => record.transmissionId);
   }
 
+  /**
+   * Registro da fila que pertence ao usuário logado agora, ou undefined.
+   *
+   * O IndexedDB é do NAVEGADOR, não do usuário: numa máquina compartilhada convivem registros de
+   * todo mundo que já vendeu ali. Buscar só pelo localId deixava o segundo usuário abrir uma URL
+   * `/venda/document?offlineEdit=...` esquecida pelo primeiro e ver cliente, itens, preços e
+   * observações de outra pessoa — além de poder editar e apagar.
+   *
+   * Sem ownerKey (sessão ausente ou expirada) nada é devolvido: negar é o padrão seguro.
+   */
+  private async doUsuarioAtual(localId: string): Promise<OfflineQueueRecord | undefined> {
+    const ownerKey = this.context.currentOwnerKey();
+    if (!ownerKey) return undefined;
+    const record = await offlineDb.queue.get(localId);
+    return record?.ownerKey === ownerKey ? record : undefined;
+  }
+
   async retry(localId: string): Promise<void> {
+    if (!await this.doUsuarioAtual(localId)) return;
     await offlineDb.queue.update(localId, {
       status: 'PENDING',
       lastError: undefined,
@@ -70,11 +88,11 @@ export class OfflineQueueService {
   }
 
   get(localId: string): Promise<OfflineQueueRecord | undefined> {
-    return offlineDb.queue.get(localId);
+    return this.doUsuarioAtual(localId);
   }
 
   async edit(localId: string, quotation: PedidoVenda, customerName: string, _total?: number): Promise<void> {
-    const current = await offlineDb.queue.get(localId);
+    const current = await this.doUsuarioAtual(localId);
     if (!current || !['PENDING', 'ERROR'].includes(current.status)) return;
     await offlineDb.queue.update(localId, {
       quotation,
@@ -90,7 +108,7 @@ export class OfflineQueueService {
   }
 
   async remove(localId: string): Promise<void> {
-    const current = await offlineDb.queue.get(localId);
+    const current = await this.doUsuarioAtual(localId);
     if (!current || !['PENDING', 'ERROR'].includes(current.status)) return;
     await offlineDb.queue.delete(localId);
     await this.refresh();
