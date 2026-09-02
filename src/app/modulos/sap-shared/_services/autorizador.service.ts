@@ -25,13 +25,22 @@ export class AutorizadorService {
       .pipe(map(it => (it || []).map(a => this.toAutorizador(a))))
   }
 
+  /**
+   * Motivos que o motor de regras realmente produz (uma classe RegraAutorizacao por motivo, no
+   * backend). O cadastro era campo livre: um erro de digitacao criava autorizador para um motivo
+   * que nenhuma regra gera, e o documento ficava pendente sem ninguem que pudesse aprovar.
+   */
+  getMotivos() : Observable<Array<string>>{
+    return this.httpCliente.get<Array<string>>(this.url+"/motivos")
+  }
+
   criar(autorizador : Partial<Autorizador>) : Observable<Autorizador>{
     return this.httpCliente
       .post<Autorizador>(this.url, autorizador)
       .pipe(map(it => this.toAutorizador(it)))
   }
 
-  remover(code : number) : Observable<any>{
+  remover(code : string) : Observable<any>{
     return this.httpCliente.delete(this.url+"/"+code)
   }
 }

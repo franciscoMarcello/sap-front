@@ -1,85 +1,155 @@
-import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { Item } from '../../model/item';
+import { of, throwError } from 'rxjs';
+import { DocumentStatementComponent } from './documento.statement.component';
 
-describe('Item', () => {
-  let item: Item;
+/**
+ * O valor do frete na tela nao pode sobreviver a uma mudanca no pedido. Antes, durante o
+ * recalculo o campo seguia exibindo o valor anterior como se fosse o vigente - e se a chamada
+ * falhasse ou nunca voltasse, um numero irreal ficava travado na tela e entrava no total.
+ */
+describe('DocumentStatementComponent - frete confiavel na tela', () => {
+
+  let component: DocumentStatementComponent;
+  let regiaoService: any;
+
+  function item(quantidade : number) {
+    return { quantidade, unitPriceLiquid: () => 10, PriceList: 1, GroupNum: 1 } as any;
+  }
+
+  function regiaoQueCalcula(total : number) {
+    return [{ ativa: true, U_Filial: 2, calcularFrete: () => ({ total }) }];
+  }
 
   beforeEach(() => {
-    item = new Item();
+    regiaoService = { getByLocalidade: () => of(regiaoQueCalcula(500)) };
+    component = new DocumentStatementComponent(
+      {} as any, {} as any, {} as any, regiaoService,
+      { get: () => of({ Code: '20', Name: 'MANICORE' }) } as any,
+      { tipoOperacao: [] } as any, {} as any, {} as any,
+      { snapshot: { queryParamMap: { get: () => null } } } as any,
+      { backendOnline: true, hasValidCatalog: false } as any,
+      {} as any, {} as any);
+    component.ngOnInit();
+
+    component.tipoEnvio = 'ent';
+    component.branchId = 2;
+    component.businesPartner = { CardCode: 'CLI001' } as any;
+    component.enderecoEntrega = { AddressName: 'ENTREGA', U_Localidade: 20 } as any;
+    component.itens = [item(10)];
   });
 
-  it('desconto 1', () => { 
-    let item = new Item();
+  /** Estado inicial: nada calculado ainda, entao nao ha valor para mostrar. */
+  it('nasce sem frete confirmado', () => {
+    expect(component.freteCalculado).toBeFalse();
+  });
 
-    item.UnitPrice = 32141.76;
-    item.jurosCondicaoPagamento = 0;
-    item.quantidade = 3242;
-    item.descontoCondicaoPagamento = 11; 
+  it('invalida o valor assim que um recalculo comeca', () => {
+    component.changeItens([item(10)]);
+    expect(component.freteCalculado).toBeFalse();
+  });
 
-    let precoUnitarioEsperado = item.unitPriceLiquid();
-    let resultado = item.totalSemFormatacao();
+  it('zera o frete quando o pedido fica sem itens, em vez de manter o valor antigo', () => {
+    component.changeItens([]);
 
-    expect('28606.17').toBe(precoUnitarioEsperado.toString()); 
-    expect('92741203.14').toBe(resultado.toString()); 
-});
+    expect(component.frete).toEqual(0);
+    expect(component.freteCalculado).toBeTrue();
+  });
 
-it('desconto 2', () => { 
-  let item = new Item();
+  it('zera o frete ao voltar para retirada', () => {
+    component.tipoEnvio = 'ret';
+    component.changeItens([item(10)]);
 
-  item.UnitPrice = 98754.23;
-  item.jurosCondicaoPagamento = 0;
-  item.quantidade = 324252;
-  item.descontoCondicaoPagamento = 12; 
+    expect(component.frete).toEqual(0);
+    expect(component.freteCalculado).toBeTrue();
+  });
 
-  let precoUnitarioEsperado = item.unitPriceLiquid();
-  let resultado = item.totalSemFormatacao();
+  it('nao soma frete nao confirmado no total', () => {
+    component.frete = 500;
+    component.freteCalculado = false;
 
-  expect('86903.72').toBe(precoUnitarioEsperado.toString()); 
-  expect('28178705017.44').toBe(resultado.toString()); 
-});
+    expect(component.total()).toEqual(100);
+  });
 
-it('juros', () => { 
-  let item = new Item();
+  it('soma o frete no total depois de confirmado', () => {
+    component.frete = 500;
+    component.freteCalculado = true;
 
-  item.UnitPrice = 54783.32;
-  item.jurosCondicaoPagamento = 8;
-  item.quantidade = 75654;
-  item.descontoCondicaoPagamento = 0; 
+    expect(component.total()).toEqual(600);
+  });
 
-  let precoUnitarioEsperado = item.unitPriceLiquid();
-  let resultado = item.totalSemFormatacao();
+  /**
+   * Faixa de preco por quantidade: ate 99 itens custa R$ 10/un, de 100 em diante R$ 5/un.
+   * 60 + 40 somam 100 e alcancam a faixa barata que nenhum dos dois grupos atinge sozinho.
+   */
+  function regiaoComFaixas() {
+    return {
+      ativa: true,
+      U_Filial: 2,
+      calcularFrete: (_cod: string, quantidade: number) =>
+        ({ total: quantidade * (quantidade >= 100 ? 5 : 10) }),
+    } as any;
+  }
 
-  expect('59165.99').toBe(precoUnitarioEsperado.toString()); 
-  expect('4476143807.46').toBe(resultado.toString()); 
-});
+  /**
+   * O frete de cada documento tem que sair da quantidade DAQUELE grupo. Ratear o frete combinado
+   * aplicava a faixa dos 100 itens aos dois documentos, e o backend - que revalida cada documento
+   * sozinho, com 60 e com 40 - nao reproduz esse valor: os documentos seriam recusados.
+   */
+  it('calcula o frete de cada documento pela quantidade do proprio grupo', () => {
+    (component as any).regiaoFrete = regiaoComFaixas();
+    (component as any).localidadeFrete = '20';
+    component.itens = [
+      { ...item(60), GroupNum: 'A' } as any,
+      { ...item(40), GroupNum: 'B' } as any,
+    ];
 
-it('juros 2', () => { 
-  let item = new Item();
+    const grupos = Array.from(component.agruparPorGroupNum().values());
+    const fretes = grupos.map(itens => (component as any).freteDoGrupo(itens));
 
-  item.UnitPrice = 164.32;
-  item.jurosCondicaoPagamento = 11;
-  item.quantidade = 101;
-  item.descontoCondicaoPagamento = 0; 
+    //60 x 10 e 40 x 10 - cada um na sua faixa, nao na faixa dos 100 combinados
+    expect(fretes).toEqual([600, 400]);
+  });
 
-  let precoUnitarioEsperado = item.unitPriceLiquid();
-  let resultado = item.totalSemFormatacao();
+  /** O total exibido tem que ser o que sera cobrado de verdade, nao o do pedido combinado. */
+  it('o total do frete e a soma do que cada documento vai cobrar', () => {
+    (component as any).regiaoFrete = regiaoComFaixas();
+    (component as any).localidadeFrete = '20';
+    component.itens = [
+      { ...item(60), GroupNum: 'A' } as any,
+      { ...item(40), GroupNum: 'B' } as any,
+    ];
 
-  expect('182.40').toBe(precoUnitarioEsperado.toString()); 
-  expect('18422.40').toBe(resultado.toString()); 
-});
+    //combinado seria 100 x 5 = 500; dividido, sao 1000
+    expect((component as any).somaDoFretePorGrupo()).toEqual(1000);
+  });
 
-it('mais o segundo desconto', () => { 
-  let item = new Item();
+  /** Sem divisao, um grupo so: o frete e o da quantidade inteira. */
+  it('pedido em um documento so usa a faixa da quantidade total', () => {
+    (component as any).regiaoFrete = regiaoComFaixas();
+    (component as any).localidadeFrete = '20';
+    component.itens = [{ ...item(100), GroupNum: 'A' } as any];
 
-  item.UnitPrice = 162.59;
-  item.jurosCondicaoPagamento = 0;
-  item.descontoCondicaoPagamento = 11; 
-  item.quantidade = 101;
-  
-  let precoUnitarioEsperado = item.unitPriceLiquid();
-  let resultado = item.totalSemFormatacao();
+    expect((component as any).somaDoFretePorGrupo()).toEqual(500);
+  });
 
-  expect('144.71').toBe(precoUnitarioEsperado.toString()); 
-  expect('14615.71').toBe(resultado.toString()); 
-});
+  it('sem regiao resolvida o frete do grupo e zero', () => {
+    (component as any).regiaoFrete = null;
+    component.itens = [{ ...item(10), GroupNum: 'A' } as any];
+
+    expect((component as any).freteDoGrupo(component.itens)).toEqual(0);
+  });
+
+  /** Falha na busca da regiao tem que virar zero + erro, nunca deixar o valor anterior. */
+  it('nao mantem o valor anterior quando a busca de regiao falha', (done) => {
+    component.frete = 500;
+    component.freteCalculado = true;
+    regiaoService.getByLocalidade = () => throwError(() => new Error('rede'));
+
+    component.changeItens([item(10)]);
+
+    setTimeout(() => {
+      expect(component.frete).toEqual(0);
+      expect(component.freteErro).toBeTruthy();
+      done();
+    }, 500);
+  });
 });

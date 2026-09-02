@@ -1,5 +1,5 @@
 import { BrowserModule } from '@angular/platform-browser';
-import { DEFAULT_CURRENCY_CODE, LOCALE_ID, NgModule } from '@angular/core';
+import { APP_INITIALIZER, DEFAULT_CURRENCY_CODE, LOCALE_ID, NgModule } from '@angular/core';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { HttpClientModule, HttpClient, HTTP_INTERCEPTORS } from '@angular/common/http';
 import { CoreModule } from './core/core.module';
@@ -86,6 +86,7 @@ import { FormaPagamentoService } from './sap/service/forma-pagamento.service';
 import { ParceiroNegocioComponent } from './sap/components/parceiro-negocio/parceiro-negocio.component';
 import { ParceiroNegocioSingleComponent } from './sap/components/parceiro-negocio/single-parceiro-negocio/single-parceiro-negocio.component';
 import { RegiaoComponent } from './sap/components/regiao/regiao.component';
+import { NormalizacaoCadastroComponent } from './sap/components/normalizacao-cadastro/normalizacao-cadastro.component';
 import { RegiaoFretePdfComponent } from './sap/components/regiao/regiao-frete-pdf/regiao-frete-pdf.component';
 import { LocalidadeComponent } from './sap/components/localidade/localidade.component';
 import { MapaRelacoesComponent } from './sap/components/mapa-relacoes/mapa-relacoes.component';
@@ -105,6 +106,11 @@ import { GerarPixComponent } from './shared/components/gerar-pix/gerar-pix.compo
 import { PixLinkComponent } from './shared/components/pix-link/pix-link.component';
 import { PixPageComponent } from './modulos/financeiro/pix-page/pix-page.component';
 import { GerarPdfComponent } from './sap/components/venda-futura/gerar-pdf/gerar-pdf.component';
+import { ServiceWorkerModule } from '@angular/service-worker';
+import { APP_CONFIG } from '../environments/environment';
+import { OfflineStatusComponent } from './core/offline/offline-status/offline-status.component';
+import { OfflineHistoryComponent } from './core/offline/offline-history/offline-history.component';
+import { OfflineContextService } from './core/offline/offline-context.service';
 import { CalculadoraModule } from './modulos/calculadora-preco-venda/calculadora.module';
 import { ProducaoModule } from './modulos/producao/producao.module';
 import { LoadingBarModule } from '@ngx-loading-bar/core';
@@ -174,6 +180,7 @@ const httpLoaderFactory = (http: HttpClient): TranslateHttpLoader =>  new Transl
     ParceiroNegocioComponent,
     ParceiroNegocioSingleComponent,
     RegiaoComponent,
+    NormalizacaoCadastroComponent,
     RegiaoFretePdfComponent,
     LocalidadeComponent,
     MapaRelacoesComponent,
@@ -193,6 +200,8 @@ const httpLoaderFactory = (http: HttpClient): TranslateHttpLoader =>  new Transl
     GerarPixComponent,
     PixLinkComponent,
     PixPageComponent,
+    OfflineStatusComponent,
+    OfflineHistoryComponent,
   ],
   imports: [
     NgxPaginationModule,
@@ -221,8 +230,18 @@ const httpLoaderFactory = (http: HttpClient): TranslateHttpLoader =>  new Transl
     }),
     // ProfabricComponentsModule,
     StoreModule.forRoot({ui: uiReducer}),
+    ServiceWorkerModule.register('ngsw-worker.js', {
+      enabled: APP_CONFIG.production,
+      registrationStrategy: 'registerWhenStable:30000'
+    }),
   ],
   providers: [
+    {
+      provide: APP_INITIALIZER,
+      useFactory: (offline: OfflineContextService) => () => offline.initialize(),
+      deps: [OfflineContextService],
+      multi: true
+    },
     {
       provide: LOCALE_ID,
       useValue: "pt-BR"

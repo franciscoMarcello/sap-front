@@ -479,7 +479,7 @@ changePageFunction(nextLink: string) {
     const endereco = this.enderecoEditando;
     this.loading = true;
     this.businessPartnerService
-      .setLocalidadeEndereco(this.selected.CardCode, endereco.AddressName, codigo)
+      .setLocalidadeEndereco(this.selected.CardCode, endereco.AddressName, endereco.AddressType, codigo)
       .subscribe({
         next: (pn) => {
           this.selected.BPAddresses = pn.BPAddresses;

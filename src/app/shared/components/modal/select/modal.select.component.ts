@@ -25,6 +25,12 @@ export class ModalSelectComponent implements OnInit {
   resultadoBusca : Page<any> = new Page()
   @Input()
   uppercaseKeyword = false
+
+  @Input()
+  set initialContent(value : any){
+    if(value)
+      this.content = value
+  }
   
   @Output()
   changePage = new EventEmitter<number>();
@@ -71,6 +77,16 @@ export class ModalSelectComponent implements OnInit {
       this.closeModal()
       this.contentSelected.emit(this.content)
     }
+  }
+
+  /**
+   * Busca que retornou um resultado so: seleciona sozinho, para o usuario nao ter que abrir o
+   * modal e clicar na unica linha possivel. Mesmo efeito de clicar na linha em action().
+   */
+  selecionaUnico(item : any){
+    this.content = item
+    this.closeModal()
+    this.contentSelected.emit(this.content)
   }
 
   clear(){

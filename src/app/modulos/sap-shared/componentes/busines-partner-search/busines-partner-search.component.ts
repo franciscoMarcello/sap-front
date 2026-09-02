@@ -1,4 +1,4 @@
-import { Component, EventEmitter, Output } from '@angular/core';
+import { Component, EventEmitter, Input, Output } from '@angular/core';
 import { BusinessPartnerDefinition } from '../../../../sap/model/business-partner/business-partner-definition';
 import { BusinessPartnerService } from '../../_services/business-partners.service';
 
@@ -12,6 +12,9 @@ import { BusinessPartnerService } from '../../_services/business-partners.servic
 export class BusinesPartnerSearchComponent {
 
   businessPartnerDefinition = new BusinessPartnerDefinition().getDefinition()
+
+  @Input()
+  initial : any
 
   @Output()
   selected = new EventEmitter();

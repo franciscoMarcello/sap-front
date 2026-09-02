@@ -26,7 +26,7 @@ export class BusinessPartner implements Actiable{
     SalesPersonCode : number
     SalesEmployeeName : string
 
-    private _addressOptions
+    private _addressOptions : Map<string, Array<Option>> = new Map()
     private _referenceOptions
     
     CpfCnpjStr() : String {
@@ -56,18 +56,30 @@ export class BusinessPartner implements Actiable{
         return new RouteLink(this.CardCode,"/clientes/parceiro-negocio/"+this.CardCode)
     }
 
+    /**
+     * Cache POR TIPO. Antes era um campo unico preenchido antes de o filtro entrar na conta:
+     * quem chamasse primeiro definia o conteudo para todas as chamadas seguintes daquela
+     * instancia. Uma tela que chamasse sem tipo fazia o seletor de entrega listar tambem
+     * enderecos de cobranca - e, com a trava de regiao, validar contra o endereco errado.
+     *
+     * O cache nao pode simplesmente sair: o app-select reaplica a selecao observando a
+     * REFERENCIA do array, entao devolver um array novo a cada ciclo de deteccao zeraria o que
+     * o usuario marcou.
+     */
     getAddressOptions(tipo = null) : Array<Option>{
-        if(this._addressOptions)
-            return this._addressOptions
+        const chave = tipo ?? '*'
+        if(this._addressOptions.has(chave))
+            return this._addressOptions.get(chave)
         if(this.BPAddresses && this.BPAddresses.length > 0){
-            this._addressOptions = this.BPAddresses
+            const opcoes = this.BPAddresses
                 .map(it => Object.assign(new BPAddress(null),it))
                 .filter(it => tipo == null || it.AddressType == tipo)
                 .map(it => new Option(it , it.toString()))
-            return this._addressOptions
+            this._addressOptions.set(chave, opcoes)
+            return opcoes
         }
         else
-            return new Array()                
+            return new Array()
     }
 
 

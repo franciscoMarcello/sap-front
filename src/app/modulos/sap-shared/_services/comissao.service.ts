@@ -1,8 +1,10 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable } from '@angular/core';
-import { Observable, map } from 'rxjs';
+import { Observable, from, map } from 'rxjs';
 import { ConfigService } from '../../../core/services/config.service';
 import { Comissao } from '../../../sap/model/comissao';
+import { OfflineContextService } from '../../../core/offline/offline-context.service';
+import { OfflineCatalogRepository } from '../../../core/offline/offline-catalog.repository';
 
 @Injectable({
   providedIn: 'root'
@@ -11,7 +13,8 @@ export class ComissaoService {
 
   url = "http://localhost:8080/comissao"
 
-  constructor(private config : ConfigService, private hppCliente : HttpClient) {
+  constructor(private config : ConfigService, private hppCliente : HttpClient,
+    private offline: OfflineContextService, private catalog: OfflineCatalogRepository) {
     this.url = config.getHost()+"/comissao"
   }
 
@@ -34,6 +37,9 @@ export class ComissaoService {
   //comissao vinculada a uma tabela de preco (OPLN.U_tipoComissao) - usado na tela de
   //Vender pra saber o desconto maximo permitido e a comissao calculada por item
   getByIdTabela(tabela : number) : Observable<Comissao>{
+    if(this.offline.shouldUseOfflineData)
+      return from(this.catalog.get('commissionByPriceList', String(tabela)))
+        .pipe(map(value => this.toComissao(value?.commission || value)))
     return this.hppCliente
       .get<Comissao>(this.url+"/tabela/"+tabela)
       .pipe(map(it => this.toComissao(it)))
