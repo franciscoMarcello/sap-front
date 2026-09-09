@@ -20,6 +20,12 @@ export class SimulacaoFrete {
     distancia : number
     quantidade : number
     faixa : RegiaoFaixa
+    //valor por unidade vindo da faixa (distancia/100 x valor da faixa)
+    valorFaixaUnidade : number
+    //custo fixo da regiao pra trazer o produto da fabrica ate a unidade, por unidade
+    custoTransporte : number
+    //o que cada unidade custa de frete no fim das contas
+    valorUnidade : number
     total : number
 }
 
@@ -29,6 +35,10 @@ export class Regiao implements Actiable {
     U_NomeRegiao : string
     U_CodCordenador : string
     U_Filial : number
+    //custo por unidade pra trazer o produto da fabrica ate a unidade dessa regiao;
+    //soma no valor por unidade da faixa (ver calcularFrete). Regiao cadastrada
+    //antes do campo existir vem nula
+    U_CustoTransporte : number
     //"0"/"1" vindo do service layer - varias regioes podem compartilhar a
     //mesma filial, mas so uma pode estar ativa por filial ao mesmo tempo
     U_Ativa : string
@@ -37,6 +47,10 @@ export class Regiao implements Actiable {
 
     get ativa() : boolean {
         return this.U_Ativa == '1'
+    }
+
+    get custoTransporte() : number {
+        return Number(this.U_CustoTransporte || 0)
     }
 
     //as linhas so tem o codigo da localidade, o nome e resolvido pelo front sob demanda.
@@ -77,8 +91,17 @@ export class Regiao implements Actiable {
         if(distancia == null || !faixa)
             return null
         //U_ValorKm e o valor a cada 100km (evita ter que cadastrar valores
-        //fracionados de poucos centavos por km rodado)
-        return { distancia, quantidade, faixa, total : (distancia / 100) * faixa.U_ValorKm * quantidade }
+        //fracionados de poucos centavos por km rodado). O custo de transporte
+        //da regiao entra por unidade, junto do valor da faixa, entao acompanha
+        //o volume do pedido - mesma formula do back (Regiao.calcularFrete)
+        const valorFaixaUnidade = (distancia / 100) * faixa.U_ValorKm
+        const custoTransporte = this.custoTransporte
+        const valorUnidade = valorFaixaUnidade + custoTransporte
+        return {
+            distancia, quantidade, faixa,
+            valorFaixaUnidade, custoTransporte, valorUnidade,
+            total : valorUnidade * quantidade
+        }
     }
 
     getActions(): Action[] {

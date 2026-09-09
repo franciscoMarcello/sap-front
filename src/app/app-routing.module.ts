@@ -10,12 +10,14 @@ import { DocumentStatementComponent } from './sap/components/document/documento.
 import { LoginComponent } from './shared/components/login/login.component';
 import { PixLinkComponent } from './shared/components/pix-link/pix-link.component';
 import { authGuard } from './core/auth.guard';
+import { adminGuard } from './core/admin.guard';
 import { CotacoesStatementComponent } from './sap/components/marketing-document/cotacao-statement/cotacoes-statement.component';
 import { VendaFuturaStatementComponent } from './sap/components/venda-futura/venda-futura-statement.component';
 import { TransferenciaClientesComponent } from './sap/components/transferencia-clientes/transferencia.clientes.component';
 import { PedidosVendaStatementComponent } from './sap/components/marketing-document/pedido-venda-statement/pedidos-venda-statement.component';
 import { ParceiroNegocioComponent } from './sap/components/parceiro-negocio/parceiro-negocio.component';
 import { RegiaoComponent } from './sap/components/regiao/regiao.component';
+import { NormalizacaoCadastroComponent } from './sap/components/normalizacao-cadastro/normalizacao-cadastro.component';
 import { LocalidadeComponent } from './sap/components/localidade/localidade.component';
 import { MapaRelacoesComponent } from './sap/components/mapa-relacoes/mapa-relacoes.component';
 import { ComissaoComponent } from './sap/components/comissao/comissao.component';
@@ -31,6 +33,7 @@ import { ChangePassowrd } from './shared/components/change-password/change-passw
 import { ConfigService } from './core/services/config.service';
 import { PainelExpedicaoPedidosComponent } from './modulos/ordem-carregamento/componentes/painel-expedicao-pedidos/painel-expedicao-pedidos.component';
 import { PainelVendasComponent } from './modulos/painel-vendas/componentes/painel-vendas/painel-vendas.component';
+import { TicketFreteComponent } from './modulos/relatorio-frete/componentes/ticket-frete/ticket-frete.component';
 import { OrdemCarregamentoStatementComponent } from './modulos/ordem-carregamento/componentes/statement';
 import { PixPageComponent } from './modulos/financeiro/pix-page/pix-page.component';
 import { SapLinkButtonDemoComponent } from './shared/components/sap-link-button/sap-link-button-demo.component';
@@ -38,6 +41,7 @@ import { DocumentosSapComponent } from './sap/components/documentos-sap/document
 import { MeusDadosComponent } from './sap/components/meus-dados/meus-dados.component';
 import { CobrancaStatementComponent } from './modulos/cobranca/componentes/cobranca-statement.component';
 import { CobrancaDashboardComponent } from './modulos/cobranca/componentes/cobranca-dashboard.component';
+import { OfflineHistoryComponent } from './core/offline/offline-history/offline-history.component';
 
  let routes: Routes = [
   {
@@ -148,6 +152,13 @@ import { CobrancaDashboardComponent } from './modulos/cobranca/componentes/cobra
         component: DocumentStatementComponent
       },
       {
+        path: 'offline',
+        title: 'Cotações offline',
+        canActivate: [authGuard],
+        data: ["icon:fas fa-cloud-upload-alt"],
+        component: OfflineHistoryComponent
+      },
+      {
         path: 'cotacao',
         title: 'Cotação',
         canActivate: [authGuard],
@@ -227,6 +238,13 @@ import { CobrancaDashboardComponent } from './modulos/cobranca/componentes/cobra
         data: ["icon:fas fa-calculator"],
         canActivate: [authGuard],
         component: CalculadoraStatementComponent,
+      },
+      {
+        path: 'ticket-frete',
+        title: 'Ticket Médio de Frete',
+        data: ["icon:fas fa-truck-moving"],
+        canActivate: [authGuard],
+        component: TicketFreteComponent
       },
     ]
   },
@@ -327,6 +345,15 @@ import { CobrancaDashboardComponent } from './modulos/cobranca/componentes/cobra
         data: ["icon:fas fa-list-ul"],
         canActivate: [authGuard],
         component: RegrasTravaComponent
+      },
+      {
+        //"role:admin" tira o item do menu de quem nao e admin (MenuSidebarComponent.isRolePermitida);
+        //o adminGuard barra o acesso direto pela URL, e o backend exige o papel de novo
+        path: 'normalizar-cadastros',
+        title: 'Normalizar cadastros',
+        data: ["icon:fas fa-font", "role:admin"],
+        canActivate: [adminGuard],
+        component: NormalizacaoCadastroComponent
       },
     ]
   },

@@ -35,6 +35,10 @@ export class CondicaoPagamentoSelectComponent implements OnInit, OnChanges {
       this.loading = true;
       this.service.getByTabela(changes.tabela.currentValue).subscribe( data =>{
         this.opcoes = data.map(it => new Option(it,it.PymntGroup))
+        this.selected = data.find(term =>
+          String(term.GroupNum) === String(this.selected?.GroupNum)
+          && String(term.ListNum) === String(this.selected?.ListNum ?? changes.tabela.currentValue)
+        ) ?? this.selected
         this.loading = false;
       })
     }

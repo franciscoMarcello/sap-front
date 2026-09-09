@@ -1,6 +1,7 @@
 <app-search 
     [definition]="businessPartnerDefinition"
     [service]="bpService"
+    [initialContent]="initial"
     (contentSelected)="selectedFun($event)"
     [name]="'Cliente'">
 </app-search>

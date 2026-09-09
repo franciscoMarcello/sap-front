@@ -37,6 +37,7 @@ async function setupAuth(conf: any): Promise<void> {
   const host = resolveHost(conf);
   try {
     const authConfig: AuthConfig = await fetch(`${host}/auth/config`).then(r => r.json());
+    localStorage.setItem('auth_config_cache', JSON.stringify(authConfig));
     // @ts-ignore
     window['auth-config'] = authConfig;
     if (authConfig.mode === 'keycloak' && authConfig.keycloak) {
@@ -44,21 +45,28 @@ async function setupAuth(conf: any): Promise<void> {
     }
   } catch (e) {
     console.error('Nao foi possivel obter o modo de autenticacao do backend', e);
-    // fallback: assume modo interno
+    // Sem backend, preserva o ultimo modo conhecido, mas nao inicializa o adapter:
+    // tentar renovar o Keycloak durante o boot offline apagaria os tokens locais.
+    const cached = localStorage.getItem('auth_config_cache');
     // @ts-ignore
-    window['auth-config'] = { mode: 'internal' };
+    window['auth-config'] = cached ? JSON.parse(cached) : { mode: 'internal', offlineEnabled: false };
   }
 }
 
 fetch('config')
   .then(response => response.json())
   .then(async conf => {
+    localStorage.setItem('app_config_cache', JSON.stringify(conf));
     // @ts-ignore
     window['app-config'] = conf;
     await setupAuth(conf);
     bootstrap();
   })
   .catch(async () => {
-    await setupAuth(null);
+    const cached = localStorage.getItem('app_config_cache');
+    const conf = cached ? JSON.parse(cached) : null;
+    // @ts-ignore
+    window['app-config'] = conf || {};
+    await setupAuth(conf);
     bootstrap();
   });

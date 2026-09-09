@@ -26,6 +26,14 @@ export class ItensComponent implements OnInit {
   @Input()
   title = "Produtos"
 
+  @Input()
+  set initialItems(value: Array<Item>) {
+    if(value && value !== this.itens) {
+      this.itens = value
+      this.itens.forEach(item => this.carregarComissao(item.PriceList))
+    }
+  }
+
   @Output()
   changeItens = new EventEmitter<Array<Item>>();
 
@@ -60,6 +68,13 @@ export class ItensComponent implements OnInit {
     item.quantidade = 1
     this.itens.push(item)
     this.carregarComissao(item.PriceList)
+    this.changeItens.emit(this.itens)
+  }
+
+  //o [(ngModel)] da quantidade altera o item no lugar, entao o pai nao tem
+  //como perceber sozinho - sem esse emit o frete (que depende da quantidade
+  //total) ficava parado no valor calculado quando o item foi adicionado
+  quantidadeChange(){
     this.changeItens.emit(this.itens)
   }
 

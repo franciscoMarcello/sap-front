@@ -3,6 +3,7 @@ import jsPDF from 'jspdf';
 import autoTable, { RowInput } from 'jspdf-autotable';
 import { Regiao } from '../../../model/regiao/regiao';
 import { Localidade } from '../../../model/localidade/localidade';
+import { Branch } from '../../../model/branch';
 
 export class RegiaoDadosImpressao {
   regiao : Regiao;
@@ -17,6 +18,9 @@ export class RegiaoFretePdfComponent {
 
   @Input() regiao : Regiao;
   @Input() localidades : Array<Localidade> = [];
+  //so pra resolver o nome da filial de origem impressa no cabecalho - a regiao
+  //guarda o BPLID, nao o nome
+  @Input() filiais : Array<Branch> = [];
 
   gerarPdf(): void {
     if (!this.regiao) return;
@@ -47,7 +51,7 @@ export class RegiaoFretePdfComponent {
   private montarPaginaRegiao(doc : jsPDF, regiao : Regiao, localidades : Array<Localidade>): void {
     const pageW = doc.internal.pageSize.getWidth();
     const marginX = 10;
-    const tableStartY = 25;
+    const tableStartY = 30;
     const nomeRegiao = regiao.U_NomeRegiao || regiao.Name || regiao.Code;
 
     doc.setFont('helvetica', 'bolditalic');
@@ -55,10 +59,15 @@ export class RegiaoFretePdfComponent {
     doc.setTextColor(0, 0, 0);
     doc.text(`Tabela de Frete - ${nomeRegiao} (${regiao.Code})`, pageW / 2, 12, { align: 'center' });
 
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.setTextColor(0, 0, 0);
+    doc.text(`Filial de origem: ${this.nomeFilial(regiao.U_Filial)}`, pageW / 2, 18, { align: 'center' });
+
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(9);
     doc.setTextColor(100, 100, 100);
-    doc.text('Valores em R$ por unidade transportada', pageW / 2, 18, { align: 'center' });
+    doc.text('Valores em R$ por unidade transportada', pageW / 2, 24, { align: 'center' });
 
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(9);
@@ -80,9 +89,10 @@ export class RegiaoFretePdfComponent {
       };
     });
 
+    //a distancia continua sendo o criterio de agrupamento e a base do calculo,
+    //mas nao vai impressa: a tabela entregue ao cliente mostra so o preco final
     const headRow = [
       { content: 'Localidade', styles: { fontStyle: 'bold' as 'bold', halign: 'left' as 'left' } },
-      { content: 'Distância (km)', styles: { fontStyle: 'bold' as 'bold', halign: 'center' as 'center' } },
       ...faixaHeaders
     ];
 
@@ -91,10 +101,12 @@ export class RegiaoFretePdfComponent {
     const body: RowInput[] = grupos.map(grupo => {
       return [
         { content: grupo.nomes, styles: { halign: 'left' as 'left' } },
-        { content: grupo.distancia != null ? this.formatNumero(grupo.distancia) : '-', styles: { halign: 'center' as 'center' } },
         ...faixas.map(faixa => {
-          //U_ValorKm e o valor a cada 100km, nao por km
-          const valor = grupo.distancia != null ? (grupo.distancia / 100) * (faixa.U_ValorKm || 0) : null;
+          //U_ValorKm e o valor a cada 100km, nao por km; o custo de transporte da
+          //regiao ja entra embutido no valor por unidade (ver Regiao.calcularFrete)
+          const valor = grupo.distancia != null
+            ? (grupo.distancia / 100) * (faixa.U_ValorKm || 0) + regiao.custoTransporte
+            : null;
           return {
             content: valor != null ? `R$ ${this.formatCurrency(valor)}` : '-',
             styles: { halign: 'right' as 'right' }
@@ -132,6 +144,17 @@ export class RegiaoFretePdfComponent {
       margin: { top: tableStartY, left: marginX, right: marginX, bottom: 10 },
       showHead: 'everyPage'
     });
+  }
+
+  //o Branch vindo do backend as vezes traz Bplid/BPLID dependendo da origem,
+  //cobrimos os dois (mesmo tratamento de RegiaoComponent.bplid)
+  private nomeFilial(bplid : number): string {
+    if (!bplid) return 'Não vinculada';
+    const filial : any = (this.filiais || []).find(it => {
+      const valor = (it as any).BPLID ?? (it as any).Bplid;
+      return valor != null && Number(valor) == bplid;
+    });
+    return filial ? (filial.BPLName ?? filial.Bplname) : String(bplid);
   }
 
   /**
@@ -198,9 +221,5 @@ export class RegiaoFretePdfComponent {
 
   private formatCurrency(value: number): string {
     return value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  }
-
-  private formatNumero(value: number): string {
-    return value.toLocaleString('pt-BR', { maximumFractionDigits: 2 });
   }
 }

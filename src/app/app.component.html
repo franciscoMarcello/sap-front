@@ -4,6 +4,7 @@
 </ng-container>
 
 <div [class]="isPublicRoute ? '' : 'content-wrapper'">
+    <app-offline-status *ngIf="!isPublicRoute && offlineContext.offlineEnabled"></app-offline-status>
     <div *ngIf="homologacao && !isPublicRoute" class="row content hmg">
         <div class="rb-mp ribbon-wrapper ribbon-xl">
             <div class="ribbon bg-danger">

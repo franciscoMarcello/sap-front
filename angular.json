@@ -33,6 +33,7 @@
             "assets": [
               "src/favicon.svg",
               "src/logo.png",
+              "src/manifest.webmanifest",
               "src/assets",
               "src/config"
             ],
@@ -70,6 +71,8 @@
               ]
             },
             "production": {
+              "serviceWorker": true,
+              "ngswConfigPath": "ngsw-config.json",
               "optimization": true,
               "outputHashing": "all",
               "sourceMap": false,
@@ -102,6 +105,8 @@
               ]
             },
             "web-production": {
+              "serviceWorker": true,
+              "ngswConfigPath": "ngsw-config.json",
               "optimization": true,
               "outputHashing": "all",
               "sourceMap": false,

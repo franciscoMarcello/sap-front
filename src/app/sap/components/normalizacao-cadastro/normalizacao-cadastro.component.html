@@ -1,0 +1,66 @@
+<div class="card">
+  <div class="card-header">
+    <h3 class="card-title">Normalizar nomes de cadastro</h3>
+  </div>
+  <div class="card-body">
+    <p class="text-muted">
+      Passa para maiúsculo o nome dos produtos de venda, das localidades e dos clientes.
+      Só o nome é alterado — código, endereço e demais campos ficam intactos.
+      Acentos e pontuação são preservados: <em>Jose D'Avila</em> vira <em>JOSE D'AVILA</em>.
+    </p>
+
+    <button type="button" class="btn btn-primary" [disabled]="carregando || aplicando" (click)="previa()">
+      <i class="fas fa-search" [class.fa-spin]="carregando"></i>
+      {{carregando ? 'Verificando cadastros...' : 'Verificar o que será alterado'}}
+    </button>
+    <button type="button" class="btn btn-warning ml-2" [disabled]="!podeAplicar()" (click)="aplicar()">
+      <i class="fas fa-pen" [class.fa-spin]="aplicando"></i>
+      {{aplicando ? 'Aplicando...' : 'Aplicar alterações'}}
+    </button>
+
+    <div *ngIf="resultado != null" class="mt-3">
+      <div *ngIf="resultado.length == 0" class="alert alert-success mb-0">
+        Nenhum cadastro com letra minúscula encontrado.
+      </div>
+
+      <div *ngIf="resultado.length > 0">
+        <div class="alert" [ngClass]="aplicado ? 'alert-info' : 'alert-warning'">
+          <strong>{{resultado.length}}</strong> cadastro(s)
+          {{aplicado ? 'processados' : 'seriam alterados'}} —
+          {{porTipo('item')}} produto(s), {{porTipo('localidade')}} localidade(s), {{porTipo('cliente')}} cliente(s).
+          <span *ngIf="falhas() > 0" class="text-danger d-block mt-1">
+            <strong>{{falhas()}}</strong> falharam.
+          </span>
+        </div>
+
+        <div class="table-responsive" style="max-height: 60vh; overflow-y: auto;">
+          <table class="table table-sm table-striped">
+            <thead>
+              <tr>
+                <th>Tipo</th>
+                <th>Código</th>
+                <th>Nome atual</th>
+                <th>Novo nome</th>
+                <th *ngIf="aplicado">Resultado</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let it of resultado">
+                <td>{{it.tipo}}</td>
+                <td>{{it.codigo}}</td>
+                <td>{{it.atual}}</td>
+                <td><strong>{{it.novo}}</strong></td>
+                <td *ngIf="aplicado">
+                  <span *ngIf="it.aplicado" class="text-success"><i class="fas fa-check"></i></span>
+                  <span *ngIf="it.aplicado === false" class="text-danger" [title]="it.erro">
+                    <i class="fas fa-times"></i> {{it.erro}}
+                  </span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

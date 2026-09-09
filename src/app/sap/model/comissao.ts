@@ -1,7 +1,7 @@
 import { Actiable, Action, ActionReturn } from "../../shared/components/action/action.model"
 
 export class CondicaoComissao {
-    Code? : number
+    Code? : string
     LineId? : number
     U_prazo : number
     U_desconto : number = 0
@@ -9,14 +9,15 @@ export class CondicaoComissao {
 }
 
 export class LiberadoPara {
-    Code? : number
+    Code? : string
     LineId? : number
     U_Filial : string
     U_vendedor : string
 }
 
 export class Comissao implements Actiable {
-    Code : number
+    //Code e a chave do UDO no service layer: alfanumerica (ex.: "2,5"), nao numerica
+    Code : string
     Name : string
     U_porcentagem : number = 0
     //desconto maximo (%) que o vendedor pode dar numa venda vinculada a essa comissao

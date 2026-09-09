@@ -12,6 +12,11 @@ export class RadioComponent {
   @Input()
   opcoes : Array<RadioItem> = []
 
+  @Input()
+  selected : any
+
+  readonly groupName = `radio-${Math.random().toString(36).slice(2)}`
+
   @Output()
   change : EventEmitter<any> = new EventEmitter<any>();
 

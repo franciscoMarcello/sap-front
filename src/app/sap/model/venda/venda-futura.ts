@@ -21,6 +21,11 @@ export class VendaFutura {
   U_vendedor: number;
   U_cardName: string;
   U_valorFrete: number;
+  //Localidade de entrega negociada. Nula em contrato criado antes dessa funcionalidade: a
+  //retirada segue normal, mas a troca exige atribuir antes de recalcular o frete.
+  U_Localidade: number;
+  //Regiao que valia na assinatura - historico, nunca entra em calculo.
+  U_RegiaoCode: string;
   DocEntry: number;
   U_dataCriacao: string;
   DocNum: number;
@@ -161,8 +166,8 @@ export class VendaFutura {
     else return undefined;
   }
 
-  getPedidoRetirada(itens: Array<ItemRetirada>, dataEntrega: Date) {
-    return new PedidoRetirada(this.DocEntry, itens, dataEntrega);
+  getPedidoRetirada(itens: Array<ItemRetirada>, dataEntrega: Date, shipToCode: string = null) {
+    return new PedidoRetirada(this.DocEntry, itens, dataEntrega, shipToCode);
   }
 }
 

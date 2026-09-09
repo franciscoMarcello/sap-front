@@ -76,4 +76,15 @@ describe('TableComponent posicao da coluna de acoes', () => {
     expect(semAcoes[0].querySelector('app-action')).toBeNull();
     expect(semAcoes[1].textContent).toContain('Sem ações');
   });
+
+  it('permite marcar uma coluna para quebrar conteudo longo', () => {
+    component.definition = [new Column('Cliente', 'Nome').withWrap()];
+    component.content = [{ Nome: 'Cliente com um nome suficientemente longo' }];
+
+    fixture.detectChanges();
+
+    const celula = fixture.nativeElement.querySelector('tbody td');
+    expect(celula.classList).toContain('table-cell-wrap');
+    expect(celula.textContent).toContain('Cliente com um nome suficientemente longo');
+  });
 });

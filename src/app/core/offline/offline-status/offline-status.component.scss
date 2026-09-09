@@ -1,0 +1,37 @@
+.offline-status {
+  align-items: center;
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+  min-height: 42px;
+  padding: 6px 18px;
+  position: relative;
+  width: 100%;
+  z-index: 1035;
+
+  &.online { background: #e8f5ec; border-bottom: 2px solid #198754; color: #145c32; }
+  &.offline { background: #fff3cd; border-bottom: 2px solid #d39e00; color: #664d03; }
+  &.expired { background: #f8d7da; border-bottom: 2px solid #b02a37; color: #842029; }
+
+  .mode { align-items: center; display: flex; gap: 8px; }
+  .catalog { font-size: 0.875rem; }
+}
+
+.offline-progress .progress { height: 24px; position: relative; }
+.offline-progress .progress-label {
+  color: #212529;
+  font-size: 0.8rem;
+  left: 12px;
+  overflow: hidden;
+  position: absolute;
+  right: 12px;
+  text-align: center;
+  text-overflow: ellipsis;
+  top: 2px;
+  white-space: nowrap;
+}
+
+@media (max-width: 767px) {
+  .offline-status { align-items: flex-start; flex-direction: column; gap: 4px; padding: 8px 12px; }
+  .offline-status .catalog { width: 100%; }
+}

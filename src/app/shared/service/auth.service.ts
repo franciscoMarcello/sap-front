@@ -40,6 +40,10 @@ export class AuthService {
     return this.getAuthMode() === 'keycloak'
   }
 
+  isOfflineEnabled(): boolean {
+    return (window as any)['auth-config']?.offlineEnabled === true
+  }
+
   login(username: string, password: string): Observable<boolean> {
     return this.http.post<Token>(`${this.apiUrl}/logar`,new UserPassword(username,password))
       .pipe(map((response) => this.setToken(response)))
@@ -121,7 +125,14 @@ export class AuthService {
   }
 
   isLoggedIn(): boolean {
-    return !!this.getToken();
+    const token = this.getToken();
+    if (!token) return false;
+    try {
+      const expiresAt = Number(JSON.parse(window.atob(token.split('.')[1]))?.exp || 0) * 1000;
+      return expiresAt === 0 || expiresAt > Date.now();
+    } catch {
+      return false;
+    }
   }
 
   getUser() : string {
@@ -132,6 +143,12 @@ export class AuthService {
   getId() : string {
     const token = this.getDecodeToken()
     return token.jti ?? token.sub
+  }
+
+  /** Chave estavel para separar bancos offline; jti muda a cada renovacao do Keycloak. */
+  getOfflineUserId() : string {
+    const token = this.getDecodeToken()
+    return token.sap_code ?? token.jti ?? token.sub
   }
 
   isCliente() : boolean {
