@@ -21,6 +21,8 @@ import { MapaRelacoesComponent } from './sap/components/mapa-relacoes/mapa-relac
 import { ComissaoComponent } from './sap/components/comissao/comissao.component';
 import { AutorizacaoComponent } from './sap/components/autorizacao/autorizacao.component';
 import { AutorizadorComponent } from './sap/components/autorizador/autorizador.component';
+import { LiberacaoTravaComponent } from './sap/components/liberacao-trava/liberacao-trava.component';
+import { RegrasTravaComponent } from './sap/components/regras-trava/regras-trava.component';
 import { ManageRolesComponent } from './sap/components/manage-roles/manage-roles.component';
 import { AssignRoleComponent } from './sap/components/assign-role/assign-role.component';
 import { CalculadoraStatementComponent } from './modulos/calculadora-preco-venda/components/statement/statement.component';
@@ -311,6 +313,20 @@ import { CobrancaDashboardComponent } from './modulos/cobranca/componentes/cobra
         data: ["icon:fas fa-user-shield"],
         canActivate: [authGuard],
         component: AutorizadorComponent
+      },
+      {
+        path: 'liberacao-trava',
+        title: 'Liberação de Trava',
+        data: ["icon:fas fa-unlock-alt"],
+        canActivate: [authGuard],
+        component: LiberacaoTravaComponent
+      },
+      {
+        path: 'regras-trava',
+        title: 'Regras de Trava',
+        data: ["icon:fas fa-list-ul"],
+        canActivate: [authGuard],
+        component: RegrasTravaComponent
       },
     ]
   },
