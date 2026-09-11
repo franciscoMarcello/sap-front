@@ -1,6 +1,7 @@
 import { CanActivateFn, Router } from '@angular/router';
 import { inject } from '@angular/core';
 import { AuthService } from '../shared/service/auth.service';
+import { OfflineContextService } from './offline/offline-context.service';
 
 /**
  * Rota restrita por papel. Le os "role:X" do `data` da rota (que aqui e um array)
@@ -11,9 +12,14 @@ import { AuthService } from '../shared/service/auth.service';
  * Usar junto do authGuard: `canActivate: [authGuard, roleGuard]` (authGuard garante
  * login/estado; roleGuard checa papel). Espelha o adminGuard, mas parametrizado
  * pelos papeis declarados na rota.
+ *
+ * Offline: sem token valido o AuthService nao retorna papeis. Quando ha sessao
+ * offline valida (canEnterOfflineRoutes), usamos os papeis gravados na sessao —
+ * senao as rotas de venda offline (que carregam "role:") redirecionariam pra /home.
  */
 export const roleGuard: CanActivateFn = (route, state) => {
   const authService = inject(AuthService);
+  const offline = inject(OfflineContextService);
   const router = inject(Router);
 
   // O data das rotas aqui e um array (["icon:...","role:..."]) - fora do padrao do Angular.
@@ -30,10 +36,18 @@ export const roleGuard: CanActivateFn = (route, state) => {
   if (exigidas.length === 0) {
     return true;
   }
-  if (authService.hasRole('admin')) {
+
+  const papeis = new Set(authService.getRoles());
+  if (papeis.size === 0 && offline.canEnterOfflineRoutes) {
+    for (const r of offline.snapshot.session?.roles ?? []) {
+      papeis.add(r);
+    }
+  }
+
+  if (papeis.has('admin')) {
     return true;
   }
-  if (exigidas.some(r => authService.hasRole(r))) {
+  if (exigidas.some(r => papeis.has(r))) {
     return true;
   }
   return router.navigate(['/home']);

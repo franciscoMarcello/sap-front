@@ -1,4 +1,5 @@
 import { Component, OnDestroy, OnInit } from '@angular/core';
+import { Subscription } from 'rxjs';
 import { TravaOtpService, TravaOtpResponse } from '../../service/trava-otp.service';
 import { TravaRegraService, Regra } from '../../service/trava-regra.service';
 
@@ -28,6 +29,7 @@ export class LiberacaoTravaComponent implements OnInit, OnDestroy {
   copiado = false;
 
   private timer: any = null;
+  private gerarSub: Subscription | null = null;
 
   constructor(
     private travaOtpService: TravaOtpService,
@@ -44,6 +46,11 @@ export class LiberacaoTravaComponent implements OnInit, OnDestroy {
   }
 
   gerar(): void {
+    // Evita chamadas concorrentes: clique repetido ou o timer disparando a
+    // regeneracao enquanto uma requisicao ainda esta em andamento.
+    if (this.carregando) {
+      return;
+    }
     const regra = (this.regra || '').trim().toUpperCase();
     if (!regra) {
       this.erro = 'Informe a regra.';
@@ -51,7 +58,8 @@ export class LiberacaoTravaComponent implements OnInit, OnDestroy {
     }
     this.carregando = true;
     this.erro = null;
-    this.travaOtpService.gerar(regra).subscribe({
+    this.gerarSub?.unsubscribe();
+    this.gerarSub = this.travaOtpService.gerar(regra).subscribe({
       next: (resp: TravaOtpResponse) => {
         this.codigo = resp.codigo;
         this.regraGerada = resp.regra;
@@ -122,5 +130,6 @@ export class LiberacaoTravaComponent implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     this.pararContagem();
+    this.gerarSub?.unsubscribe();
   }
 }

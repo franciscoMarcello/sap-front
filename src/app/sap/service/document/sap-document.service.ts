@@ -1,6 +1,6 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable } from '@angular/core';
-import { Observable, forkJoin, map } from 'rxjs';
+import { Observable, catchError, forkJoin, map, of } from 'rxjs';
 import { ConfigService } from '../../../core/services/config.service';
 import { BranchService } from '../branch.service';
 import { Column } from '../../../shared/components/table/column.model';
@@ -106,10 +106,11 @@ class SapDocumentService implements DocumentService {
   getById(docEntry: number): Observable<DocumentList> {
     // getById traz a entidade SAP crua (só o id da filial); a lista resolve o BPLName no
     // backend. Aqui, quando o nome vier vazio, resolvemos pelo id via BranchService — senão
-    // a Filial some ao abrir a nota pelo link (com ?id=).
+    // a Filial some ao abrir a nota pelo link (com ?id=). Se o BranchService falhar, seguimos
+    // sem o nome da filial: a filial é enriquecimento, não pode bloquear abrir a nota.
     return forkJoin({
       item: this.http.get<any>(`${this.url}/${docEntry}`),
-      branches: this.branchService.get()
+      branches: this.branchService.get().pipe(catchError(() => of([])))
     }).pipe(map(({ item, branches }) => {
       const doc = this.mapDocument(this.unwrapOData(item));
       if (!doc.BPLName && doc.BPL_IDAssignedToInvoice != null) {
