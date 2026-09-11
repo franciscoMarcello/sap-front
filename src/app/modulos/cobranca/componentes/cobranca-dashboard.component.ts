@@ -51,8 +51,13 @@ export class CobrancaDashboardComponent implements OnInit, AfterViewInit, OnDest
   dashboard = new CobrancaDashboard();
   evolucao: CobrancaMes[] = [];
 
-  filialSelecionada: Branch | null = null;
+  filiaisSelecionadas: Branch[] = [];
+  // Referência estável de propósito: o app-select zera a seleção a cada nova referência que
+  // recebe, então isso só troca quando a intenção é mesmo limpar o filtro.
+  filiaisIniciais: Array<string | number> = [];
   vendedorSelecionado: SalesPerson | null = null;
+  filtroCobrador = '';
+  cobradoresDisponiveis: string[] = [];
   filtroDe = '';
   filtroAte = '';
   readonly mesesEvolucao = 6;
@@ -81,6 +86,11 @@ export class CobrancaDashboardComponent implements OnInit, AfterViewInit, OnDest
       }
       this.modoEscuro = escuroAgora;
       this.desenharTudo();
+    });
+
+    this.service.cobradores().subscribe({
+      next: (cobradores) => (this.cobradoresDisponiveis = cobradores),
+      error: () => (this.cobradoresDisponiveis = []),
     });
 
     this.buscar();
@@ -138,15 +148,17 @@ export class CobrancaDashboardComponent implements OnInit, AfterViewInit, OnDest
 
   limpar(): void {
     const hoje = new Date();
-    this.filialSelecionada = null;
+    this.filiaisSelecionadas = [];
+    this.filiaisIniciais = [];
     this.vendedorSelecionado = null;
+    this.filtroCobrador = '';
     this.filtroDe = this.paraInput(new Date(hoje.getFullYear(), hoje.getMonth(), 1));
     this.filtroAte = this.paraInput(hoje);
     this.buscar();
   }
 
-  onFilialChange(branch: Branch): void {
-    this.filialSelecionada = branch ?? null;
+  onFilialChange(branches: Branch[]): void {
+    this.filiaisSelecionadas = branches ?? [];
     this.buscar();
   }
 
@@ -193,7 +205,29 @@ export class CobrancaDashboardComponent implements OnInit, AfterViewInit, OnDest
     if (!this.statusEhClicavel(status)) {
       return;
     }
-    this.irParaTitulos({ situacaoSap: 'ABERTO', status });
+    // O widget so conta parcela JA VENCIDA - as quatro faixas de aging vao ate ontem. Sem o
+    // vencimentoAte aqui, o clique abria uma lista maior que o numero clicado, porque trazia
+    // junto a parcela a vencer que ja tem acompanhamento. verFaixa, logo acima, sempre mandou.
+    this.irParaTitulos({
+      situacaoSap: 'ABERTO',
+      status,
+      vencimentoAte: this.paraInput(this.somarDias(new Date(), -1)),
+    });
+  }
+
+  cobradorEhClicavel(cobrador: string | null | undefined): boolean {
+    return !!cobrador && cobrador !== 'Sem cobrador';
+  }
+
+  /**
+   * O texto avisa o que o clique faz DE VERDADE. "Títulos trabalhados" vem do histórico
+   * (quem registrou a ação, dentro do período); a lista filtra pelo cobrador do cabeçalho,
+   * que é sobrescrito a cada ação e não tem recorte de data. São contagens diferentes, então
+   * clicar em "70" pode abrir 69 linhas — dizer "carteira" em vez de "títulos trabalhados"
+   * evita que isso pareça erro.
+   */
+  tituloDoCobrador(cobrador: string): string {
+    return `Ver a carteira que hoje está com ${cobrador}`;
   }
 
   verFaixa(indice: number): void {
@@ -202,7 +236,7 @@ export class CobrancaDashboardComponent implements OnInit, AfterViewInit, OnDest
       return;
     }
     const hoje = new Date();
-    const extra: Record<string, string | number | boolean> = { situacaoSap: 'ABERTO' };
+    const extra: Record<string, string | number | boolean | number[]> = { situacaoSap: 'ABERTO' };
     extra.vencimentoAte = this.paraInput(this.somarDias(hoje, -faixa.DiasMin));
     if (faixa.DiasMax != null) {
       extra.vencimentoDe = this.paraInput(this.somarDias(hoje, -faixa.DiasMax));
@@ -212,23 +246,37 @@ export class CobrancaDashboardComponent implements OnInit, AfterViewInit, OnDest
 
   private getFiltro(): CobrancaDashboardFiltro {
     return {
-      filial: this.filialSelecionada?.Bplid != null ? Number(this.filialSelecionada.Bplid) : null,
+      filial: this.filiaisEscolhidas().length > 0 ? this.filiaisEscolhidas() : null,
       vendedor: this.vendedorSelecionado?.SalesEmployeeCode != null
         ? Number(this.vendedorSelecionado.SalesEmployeeCode)
         : null,
+      cobrador: this.filtroCobrador || null,
       de: this.filtroDe || null,
       ate: this.filtroAte || null,
     };
   }
 
-  private irParaTitulos(extra: Record<string, string | number | boolean>): void {
+  private filiaisEscolhidas(): number[] {
+    return this.filiaisSelecionadas
+      .map((branch) => Number(branch?.Bplid))
+      .filter((bplId) => !Number.isNaN(bplId));
+  }
+
+  private irParaTitulos(extra: Record<string, string | number | boolean | number[]>): void {
     const filtro = this.getFiltro();
-    const queryParams: Record<string, string | number | boolean> = { origem: 'resultado', ...extra };
-    if (filtro.filial != null) {
+    const queryParams: Record<string, string | number | boolean | number[]> = { origem: 'resultado', ...extra };
+    // O recorte da tela só entra quando o próprio clique não escolheu o valor: clicar numa
+    // barra do gráfico de filial manda aquela filial, não as que estavam filtradas.
+    if (filtro.filial != null && queryParams.filial == null) {
       queryParams.filial = filtro.filial;
     }
     if (filtro.vendedor != null) {
       queryParams.vendedor = filtro.vendedor;
+    }
+    // O recorte da tela vai junto pro drill-down, menos quando o clique ja escolheu um
+    // cobrador (a linha da tabela de cobradores) - ai vale o do clique.
+    if (filtro.cobrador != null && queryParams.cobrador == null) {
+      queryParams.cobrador = filtro.cobrador;
     }
     this.router.navigate(['/cobranca/titulos'], { queryParams });
   }
