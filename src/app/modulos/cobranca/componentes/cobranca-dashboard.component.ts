@@ -2,7 +2,8 @@ import { AfterViewInit, Component, ElementRef, OnDestroy, OnInit, ViewChild } fr
 import { formatCurrency } from '@angular/common';
 import { Router } from '@angular/router';
 import { Store } from '@ngrx/store';
-import { Subscription } from 'rxjs';
+import { Subject, Subscription, of } from 'rxjs';
+import { catchError, switchMap } from 'rxjs/operators';
 import Chart from 'admin-lte/plugins/chart.js/Chart.min.js';
 import { AppState } from '../../../store/state';
 import { UiState } from '../../../store/ui/state';
@@ -64,6 +65,8 @@ export class CobrancaDashboardComponent implements OnInit, AfterViewInit, OnDest
 
   private modoEscuro = false;
   private inscricaoUi: Subscription | null = null;
+  private readonly buscaSolicitada = new Subject<void>();
+  private readonly inscricoes: Subscription[] = [];
   private graficos: any[] = [];
   private viewPronta = false;
   private timerId: any = null;
@@ -88,6 +91,50 @@ export class CobrancaDashboardComponent implements OnInit, AfterViewInit, OnDest
       this.desenharTudo();
     });
 
+    // switchMap: no modo múltiplo o app-select emite a cada checkbox marcado e mantém o menu
+    // aberto, então marcar 4 filiais dispara 4 buscar() e 8 requisições em voo. Sem cancelar,
+    // quem manda no resultado é a última RESPOSTA e não a última seleção - dava pra ficar com
+    // os números de um subconjunto na tela com todas as filiais marcadas. E o cronômetro parava
+    // na primeira resposta que chegasse, com a requisição da seleção final ainda pendente.
+    this.inscricoes.push(
+      this.buscaSolicitada.pipe(
+        switchMap(() => {
+          this.carregandoResumo = true;
+          this.iniciarTimer();
+          this.erro = '';
+          // catchError dentro do switchMap: se propagar, mata o Subject e a tela nunca mais busca.
+          return this.service.dashboard(this.getFiltro()).pipe(
+            catchError(() => {
+              this.erro = 'Não foi possível carregar os indicadores de cobrança.';
+              return of(null);
+            }),
+          );
+        }),
+      ).subscribe((dashboard) => {
+        if (dashboard) {
+          this.dashboard = dashboard;
+        }
+        this.carregandoResumo = false;
+        this.pararTimer();
+        this.desenharTudo();
+      }),
+    );
+
+    this.inscricoes.push(
+      this.buscaSolicitada.pipe(
+        switchMap(() => {
+          this.carregandoEvolucao = true;
+          return this.service.evolucao(this.getFiltro(), this.mesesEvolucao).pipe(
+            catchError(() => of([] as CobrancaMes[])),
+          );
+        }),
+      ).subscribe((meses) => {
+        this.evolucao = meses;
+        this.carregandoEvolucao = false;
+        this.desenharTudo();
+      }),
+    );
+
     this.service.cobradores().subscribe({
       next: (cobradores) => (this.cobradoresDisponiveis = cobradores),
       error: () => (this.cobradoresDisponiveis = []),
@@ -103,6 +150,7 @@ export class CobrancaDashboardComponent implements OnInit, AfterViewInit, OnDest
 
   ngOnDestroy(): void {
     this.inscricaoUi?.unsubscribe();
+    this.inscricoes.forEach((inscricao) => inscricao.unsubscribe());
     this.destruirGraficos();
     this.pararTimer();
   }
@@ -114,36 +162,7 @@ export class CobrancaDashboardComponent implements OnInit, AfterViewInit, OnDest
   }
 
   buscar(): void {
-    const filtro = this.getFiltro();
-
-    this.carregandoResumo = true;
-    this.iniciarTimer();
-    this.erro = '';
-    this.service.dashboard(filtro).subscribe({
-      next: (dashboard) => {
-        this.dashboard = dashboard;
-        this.carregandoResumo = false;
-        this.pararTimer();
-        this.desenharTudo();
-      },
-      error: () => {
-        this.carregandoResumo = false;
-        this.pararTimer();
-        this.erro = 'Não foi possível carregar os indicadores de cobrança.';
-      },
-    });
-
-    this.carregandoEvolucao = true;
-    this.service.evolucao(filtro, this.mesesEvolucao).subscribe({
-      next: (meses) => {
-        this.evolucao = meses;
-        this.carregandoEvolucao = false;
-        this.desenharTudo();
-      },
-      error: () => {
-        this.carregandoEvolucao = false;
-      },
-    });
+    this.buscaSolicitada.next();
   }
 
   limpar(): void {
