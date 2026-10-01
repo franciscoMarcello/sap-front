@@ -127,6 +127,7 @@ import { PainelVendasModule } from './modulos/painel-vendas/painel-vendas.module
 import { RelatorioFreteModule } from './modulos/relatorio-frete/relatorio-frete.module';
 import { QRCodeModule } from 'angularx-qrcode';
 import { CobrancaModule } from './modulos/cobranca/cobranca.module';
+import { NotaFiscalLoteModule } from './modulos/nota-fiscal-lote/nota-fiscal-lote.module';
 import { RelatorioModule } from './modulos/relatorio/relatorio.module';
 import { BsDatepickerModule } from 'ngx-bootstrap/datepicker';
 
@@ -231,6 +232,7 @@ const httpLoaderFactory = (http: HttpClient): TranslateHttpLoader =>  new Transl
     RelatorioFreteModule,
     RelatorioModule,
     CobrancaModule,
+    NotaFiscalLoteModule,
     ReactiveFormsModule,
     LoadingBarModule,
     LoadingBarRouterModule,
