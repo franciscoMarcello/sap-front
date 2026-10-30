@@ -1,0 +1,94 @@
+<div class="content-wrapper">
+  <section class="content-header">
+    <div class="container-fluid">
+      <h1><i class="fas fa-envelope"></i> E-mail de inadimplência</h1>
+      <p class="text-muted">
+        Relatório de títulos vencidos (notas e adiantamentos de venda futura) enviado a cada vendedor marcado
+        para receber. Aqui você define quando ele sai e quem recebe uma cópia de todos os envios.
+      </p>
+    </div>
+  </section>
+
+  <section class="content">
+    <div class="container-fluid">
+
+      <div class="card card-primary" style="max-width: 760px;">
+        <div class="card-header">
+          <h3 class="card-title">Agenda</h3>
+        </div>
+        <div class="card-body">
+
+          <div class="form-group">
+            <div class="custom-control custom-switch">
+              <input type="checkbox" class="custom-control-input" id="agenda-ativo" [(ngModel)]="agenda.ativo">
+              <label class="custom-control-label" for="agenda-ativo">
+                {{ agenda.ativo ? 'Envio automático ligado' : 'Envio automático desligado' }}
+              </label>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>Dias da semana</label><br>
+            <div class="btn-group" role="group">
+              <button *ngFor="let d of dias" type="button" class="btn btn-sm"
+                      [class.btn-primary]="temDia(d.valor)" [class.btn-outline-secondary]="!temDia(d.valor)"
+                      (click)="alternarDia(d.valor)">{{ d.nome }}</button>
+            </div>
+          </div>
+
+          <div class="form-group" style="max-width: 160px;">
+            <label>Hora</label>
+            <input type="time" class="form-control" [(ngModel)]="agenda.hora">
+            <small class="form-text text-muted">
+              Se o servidor estiver fora do ar nessa hora, o envio ainda sai até 1 hora depois.
+            </small>
+          </div>
+
+          <div class="form-group">
+            <label>E-mails em cópia</label>
+            <textarea class="form-control" rows="4" [(ngModel)]="copiaTexto"
+                      placeholder="um e-mail por linha"></textarea>
+            <small class="form-text text-muted">
+              Recebem uma cópia do e-mail de cada vendedor (todas as cópias, não um resumo). Vazio = sem cópia.
+            </small>
+          </div>
+
+          <button class="btn btn-primary" (click)="salvar()" [disabled]="carregando">
+            <i class="fas fa-save"></i> Salvar
+          </button>
+        </div>
+      </div>
+
+      <div class="card" style="max-width: 760px;">
+        <div class="card-header">
+          <h3 class="card-title">Envio</h3>
+        </div>
+        <div class="card-body">
+          <p class="mb-2">
+            <strong>Último envio agendado:</strong>
+            {{ agenda.ultimoEnvio ? (agenda.ultimoEnvio | date:'dd/MM/yyyy HH:mm') : 'nenhum' }}
+          </p>
+          <p class="mb-3">
+            <strong>Situação:</strong>
+            <span *ngIf="agenda.emAndamento" class="badge badge-info ml-1">
+              <i class="fas fa-spinner fa-spin"></i> enviando
+            </span>
+            <span *ngIf="!agenda.emAndamento"> {{ agenda.ultimoStatus || '-' }}</span>
+          </p>
+
+          <div class="form-inline">
+            <input type="number" class="form-control mr-2" style="width: 200px;" [(ngModel)]="vendedor"
+                   placeholder="Cód. do vendedor (vazio = todos)">
+            <button class="btn btn-warning" (click)="enviarAgora()" [disabled]="agenda.emAndamento">
+              <i class="fas fa-paper-plane"></i> Enviar agora
+            </button>
+          </div>
+          <small class="form-text text-muted">
+            Salve antes de enviar: o envio usa a cópia gravada. O envio manual não impede o agendado do dia.
+          </small>
+        </div>
+      </div>
+
+    </div>
+  </section>
+</div>
